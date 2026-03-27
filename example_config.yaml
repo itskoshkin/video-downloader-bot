@@ -1,0 +1,39 @@
+app:
+  log:
+    level: "WARN" # "DEBUG", "INFO", "WARN" or "ERROR"
+    log_format: "text" # "text" or "json"
+    log2console: true
+    log2file: false
+    file_path: "./application.log"
+    file_mode: "overwrite" # "overwrite", "append" or "rotate"
+    old_logs_folder: "logs/"
+  database:
+    host: "localhost"
+    port: 5432
+    user: "username"
+    password: "password"
+    database_name: "video-downloader-bot"
+    ssl_mode: "disable"
+  telegram:
+    bot:
+      token: "token"
+      drop_pending_updates: true
+      get_updates_timeout: 9 # seconds
+      http_client_timeout: 10 # seconds
+      video_dump_chat_id: -100..
+      download_folder: "./files/downloads/"
+      convert_folder: "./files/converted/"
+      rate_limit_per_minute: 12
+      rate_limit_burst: 3
+      rate_limit_per_day: 100
+      max_file_size_mb: 20 # MB; max is 50, see https://core.telegram.org/bots/faq#how-do-i-upload-a-large-file
+      max_video_duration: 300 # seconds
+      inline_cache_time: 0 # seconds
+    gotgbot_debug: false
+  yt-dlp:
+    binary_file: "yt-dlp"
+    debug: false
+    use_cookies: false
+    cookies_file: "./files/static/cookies.txt"
+  ffmpeg:
+    debug: false
