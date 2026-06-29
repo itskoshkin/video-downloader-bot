@@ -53,6 +53,7 @@ func FetchMetadata(ctx context.Context, link string) (*Metadata, error) {
 		"-J",            // Print full metadata instead of downloading video
 		"--no-playlist", // Treat link as single media item
 		"--no-warnings", // Suppress non-fatal errors and warnings
+		"--no-update",   // Never check for updates (silences the periodic "version is out of date" warning); updates are handled via pip only
 	}
 	if viper.GetBool(config.YtDlpUseCookies) {
 		args = append(args, "--cookies", viper.GetString(config.YtDlpCookiesFile)) // Load cookies from a file and use them for authenticated requests, needed when anonymous access is rate-limited or blocked because of age restrictions
@@ -86,6 +87,7 @@ func DownloadVideo(ctx context.Context, link string) (string, error) {
 		"--merge-output-format", "mp4", // f video and audio are downloaded separately, merge them into an MP4 container
 		"-o", viper.GetString(config.TelegramBotVideoDownloadFolder) + "%(id)s.%(ext)s", // Output file name template ("%(id)s" is the media ID and "%(ext)s" is the resulting file extension)
 		"--no-playlist", // Download only the single media item, not the whole playlist/thread/collection
+		"--no-update",   // Never check for updates (silences the periodic "version is out of date" warning); updates are handled via pip only
 		"--max-filesize", fmt.Sprintf("%dM", viper.GetInt(config.TelegramBotMaxFileSizeMB)), // Skip download if filesize exceeds limit
 		"--match-filter", fmt.Sprintf("duration<=?%d", viper.GetInt(config.TelegramBotMaxVideoDuration)), // Skip download if duration exceeds limit (? = skip check if duration is unknown)
 	}

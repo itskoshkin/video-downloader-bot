@@ -136,6 +136,32 @@ Thus, bot needs a channel where it can "dump" videos to get that id
 3. Give it admin rights (send and delete posts, exactly)
 4. Get ID of channel and put it in config
 
+#### Keeping `yt-dlp` up to date
+
+`yt-dlp` breaks often — sites change their players and extractors need frequent updates, so a stale `yt-dlp` will eventually start failing downloads. Always update it **via pip** (never `yt-dlp -U` for a pip-based install).
+
+The Docker image pins the latest release at build time. To update later, run `pip install -U` **inside the running container** — no restart, no downtime, and the bot uses the new `yt-dlp` on the next download:
+
+```bash
+make update-ytdlp          # docker exec <container> pip install -U yt-dlp
+```
+
+To do this automatically, install a **weekly update** cron job on the host:
+
+```bash
+make enable-cron           # adds a weekly `docker exec ... pip install -U yt-dlp` to your crontab (see scripts/enable-cron.sh)
+```
+
+Defaults: Monday 04:00, container `video-downloader-bot`, log `/var/log/crons/video-downloader-bot-ytdlp-weekly-update.log` (override via `CONTAINER` / `CRON_SCHEDULE` / `CRON_LOG` env vars). Re-running is safe — it replaces the existing entry instead of duplicating it.
+
+Alternatively, the container can self-update `yt-dlp` **on start** — opt-in, off by default so normal restarts stay fast. Enable it per-run:
+
+```bash
+docker run -e YTDLP_SELFUPDATE=true ... video-downloader-bot
+```
+
+> Updates are best-effort: if pip can't reach PyPI (e.g. behind DPI), `yt-dlp` stays on the current version.
+
 #### `yt-dlp` impersonation
 
 Some TikTok videos require *impersonation* to be downloaded correctly, otherwise you may receive an error. You will see such cases in log:

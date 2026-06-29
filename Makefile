@@ -2,7 +2,7 @@ BUILD_DIR=build
 BINARY=video-downloader-bot
 IMAGE=video-downloader-bot
 
-.PHONY: install-deps build run docker-build docker-run
+.PHONY: install-deps build run docker-build docker-run docker-restart update-ytdlp enable-cron
 
 install-deps:
 	@(command -v brew > /dev/null && brew install ffmpeg) || \
@@ -26,3 +26,12 @@ docker-run:
 		-v $(PWD)/files:/app/files \
 		-v $(PWD)/logs:/app/logs \
 		$(IMAGE)
+
+docker-restart:
+	docker restart $(IMAGE)
+
+update-ytdlp:
+	docker exec $(IMAGE) pip3 install -U --no-cache-dir --break-system-packages "yt-dlp[default,curl-cffi]"
+
+enable-cron:
+	./scripts/enable-cron.sh
