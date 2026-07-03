@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -8,6 +9,7 @@ import (
 
 	"video-downloader-bot/internal/logger"
 	"video-downloader-bot/internal/models"
+	"video-downloader-bot/internal/providers"
 	"video-downloader-bot/internal/telegram/helpers/errors"
 	"video-downloader-bot/internal/telegram/helpers/keyboards"
 	"video-downloader-bot/internal/telegram/helpers/storage"
@@ -153,5 +155,45 @@ func (b *Bot) FarewellCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	}
 
+	return nil
+}
+
+// PreviewCallback handles the "preview not working?" button: it cycles a URL-rewrite preview to the
+// next embed-fix domain. Callback data is "preview:<idx>:<detracked-link>".
+func (b *Bot) PreviewCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
+	reqCtx := req.FromExtContext(ctx)
+	callback := ctx.CallbackQuery
+
+	idxStr, link, found := strings.Cut(strings.TrimPrefix(callback.Data, "preview:"), ":")
+	idx, err := strconv.Atoi(idxStr)
+	if !found || err != nil {
+		_, _ = callback.Answer(bot, nil)
+		return nil
+	}
+
+	rewritten, ok := providers.PreviewURL(link, idx)
+	if !ok {
+		_, _ = callback.Answer(bot, nil)
+		return nil
+	}
+
+	lang := s.GetUserLanguageCode(ctx)
+	if settings, sErr := b.settings.GetOrCreate(reqCtx, callback.From.Id); sErr == nil {
+		lang = settings.Language
+	}
+
+	markup := keyboards.GetPreviewKeyboard(lang, "https://"+link, providers.PreviewCycleData(link, idx+1))
+	editOpts := &gotgbot.EditMessageTextOpts{ReplyMarkup: markup}
+	if callback.InlineMessageId != "" {
+		editOpts.InlineMessageId = callback.InlineMessageId
+		_, _, err = bot.EditMessageText(rewritten, editOpts)
+	} else if callback.Message != nil {
+		_, _, err = callback.Message.EditText(bot, rewritten, editOpts)
+	}
+	if err != nil {
+		logger.WarnWithID(reqCtx, "failed to cycle preview: %v", err)
+	}
+
+	_, _ = callback.Answer(bot, nil)
 	return nil
 }

@@ -37,3 +37,29 @@ app:
     cookies_file: "./files/static/cookies.txt"
   ffmpeg:
     debug: false
+  providers:
+    chains: # ordered provider names per platform; first success wins
+      instagram: [yt-dlp, instagrapi, hikerapi, preview]
+      # tiktok: [yt-dlp, tiktokez, preview]
+      default: [yt-dlp, preview]
+    preview: # fallback: on a failed download, rewrite the link to one of these embed-fix domains so Telegram renders a video preview
+      instagram_domains: # first entry = default, "preview not working?" cycles the rest
+        # - ddinstagram.com # Dead since April 2025 (NXDOMAIN)
+        # - fxstagram.com   # Dead shortly after (NXDOMAIN)
+        # - kkinstagram.com # Now 404 on root, moved to kkclip.com
+        # - kkclip.com      # Intrusive pop-ups & malware ads 🤡
+        # - instagramez.com # EmbedEZ (embedez.com), redirects to malvertising popunder (effectivegatecpm.com), premium "removes" it 🤡
+        - vxinstagram.com   # https://github.com/Lainmode/InstagramEmbed-vxinstagram
+        - eeinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/180#issuecomment-3285698107 / https://github.com/Wikidepia/InstaFix/issues/182#issue-3418754919
+        - uuinstagram.com   # Some Wikidepia/InstaFix instance
+        - zzinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/181#issuecomment-3507144482 / https://github.com/Knoppiix/InstaEmbedRouter
+      tiktok_domains:
+        # - vxtiktok.com # Down due to legal reasons
+        # - tiktokez.com # EmbedEZ (embedez.com)
+        # - kktiktok.com # Same kk- guys 🤡
+        - tnktok.com     # https://github.com/okdargy/fxtiktok
+        # - tfxktok.com  # Allan Fernando, closed source
+    instagrapi:
+      base_url: ""
+    hikerapi:
+      api_key: ""

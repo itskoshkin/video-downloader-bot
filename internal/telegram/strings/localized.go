@@ -53,6 +53,7 @@ type Strings struct {
 	InlineButtonOpenLink      string
 	InlineFastModeTitle       string
 	InlineFastModeDescription string
+	PreviewBrokenButton       string
 }
 
 var localized = map[string]*Strings{
@@ -92,6 +93,7 @@ var localized = map[string]*Strings{
 		InlineButtonOpenLink:        "🌐 Open link",
 		InlineFastModeTitle:         "Download video",
 		InlineFastModeDescription:   "Tap to send — video will appear shortly",
+		PreviewBrokenButton:         "Preview not working?",
 	},
 	"ru": {
 		Welcome:                     "Привет!\n\nЭтот бот бла-бла-бла бла-бла-бла\n\nБла-бла-бла бла-бла-бла бла-бла-бла\n\nОтправь /help для списка команд",
@@ -129,6 +131,7 @@ var localized = map[string]*Strings{
 		InlineButtonOpenLink:        "🌐 Открыть ссылку",
 		InlineFastModeTitle:         "Скачать видео",
 		InlineFastModeDescription:   "Нажми чтобы отправить — видео появится через некоторое время",
+		PreviewBrokenButton:         "Превью не работает?",
 	},
 	"ua": {
 		Welcome:                     "Привіт!\n\nЦей бот бла-бла-бла бла-бла-бла\n\nБла-бла-бла бла-бла-бла бла-бла-бла\n\nНадішли /help для списку команд",
@@ -166,6 +169,7 @@ var localized = map[string]*Strings{
 		InlineButtonOpenLink:        "🌐 Відкрити посилання",
 		InlineFastModeTitle:         "Завантажити відео",
 		InlineFastModeDescription:   "Натисни щоб надіслати — відео з'явиться незабаром",
+		PreviewBrokenButton:         "Прев'ю не працює?",
 	},
 }
 

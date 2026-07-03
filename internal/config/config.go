@@ -49,7 +49,18 @@ const (
 	YtDlpCookiesFile = "app.yt-dlp.cookies_file" // string (path)
 
 	FfmpegDebug = "app.ffmpeg.debug" // bool
+
+	ProvidersChainDefault   = "app.providers.chains.default"            // []string (ordered provider names)
+	PreviewInstagramDomains = "app.providers.preview.instagram_domains" // []string (embed-fix domains, primary first)
+	PreviewTiktokDomains    = "app.providers.preview.tiktok_domains"    // []string (embed-fix domains, primary first)
+	HikerApiKey             = "app.providers.hikerapi.api_key"          // string
+	InstagrapiBaseURL       = "app.providers.instagrapi.base_url"       // string
 )
+
+// ProvidersChainKey builds the config key for a platform's provider chain, e.g. "app.providers.chains.instagram".
+func ProvidersChainKey(platform string) string {
+	return "app.providers.chains." + platform
+}
 
 func LoadConfig() {
 	fmt.Print("Loading configuration...")
@@ -93,6 +104,11 @@ func ValidateConfigFields() error {
 		TelegramBotRateLimitPerMinute: 10, TelegramBotRateLimitBurst: 3, TelegramBotRateLimitPerDay: 100,
 		TelegramBotMaxFileSizeMB: 20, TelegramBotMaxVideoDuration: 300, TelegramBotInlineCacheTime: 0,
 		/* External tools */ YtDlpDebug: false, FfmpegDebug: false,
+		/* Providers */
+		ProvidersChainDefault:          []string{"yt-dlp", "preview"},
+		ProvidersChainKey("instagram"): []string{"yt-dlp", "instagrapi", "hikerapi", "preview"},
+		PreviewInstagramDomains:        []string{"vxinstagram.com", "eeinstagram.com", "uuinstagram.com", "zzinstagram.com"},
+		PreviewTiktokDomains:           []string{"tnktok.com"},
 	}
 
 	for k, v := range defaults {

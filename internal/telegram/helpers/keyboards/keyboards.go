@@ -27,6 +27,21 @@ func GetInlineResultButton(languageCode, link string) gotgbot.InlineKeyboardMark
 	}
 }
 
+// GetPreviewKeyboard builds the keyboard for a URL-rewrite preview: an "open link" button to the
+// original post plus a "preview not working?" button that cycles to the next embed-fix domain
+// (omitted when cycleData is empty, e.g. only one domain configured).
+func GetPreviewKeyboard(languageCode, openURL, cycleData string) gotgbot.InlineKeyboardMarkup {
+	rows := [][]gotgbot.InlineKeyboardButton{
+		{{Text: s.Lang(languageCode).InlineButtonOpenLink, Url: openURL}},
+	}
+	if cycleData != "" {
+		rows = append(rows, []gotgbot.InlineKeyboardButton{
+			{Text: s.Lang(languageCode).PreviewBrokenButton, CallbackData: cycleData},
+		})
+	}
+	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
 func GetSettingsKeyboard(user *models.User) *gotgbot.InlineKeyboardMarkup {
 	fastMode := s.Lang(user.Lang()).SettingsFastMode + ": "
 	if user.SettingsFastMode {

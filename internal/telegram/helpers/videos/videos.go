@@ -19,10 +19,6 @@ func FetchMetadata(ctx context.Context, link string) (*ytdlp.Metadata, error) {
 	return ytdlp.FetchMetadata(ctx, link)
 }
 
-func Download(ctx context.Context, link string) (string, error) {
-	return ytdlp.DownloadVideo(ctx, link)
-}
-
 func Convert(ctx context.Context, inputPath string) (string, error) {
 	outputPath := filepath.Join(viper.GetString(config.TelegramBotVideoConvertedFolder), strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))+".mp4")
 	_, err := ffmpeg.Convert(ctx, inputPath, outputPath)
@@ -36,13 +32,4 @@ func Convert(ctx context.Context, inputPath string) (string, error) {
 	}
 
 	return outputPath, nil
-}
-
-func DownloadAndConvert(ctx context.Context, link string) (string, error) {
-	result, err := Download(ctx, link)
-	if err != nil {
-		return "", err
-	}
-
-	return Convert(ctx, filepath.Join(viper.GetString(config.TelegramBotVideoDownloadFolder), result))
 }

@@ -12,6 +12,7 @@ import (
 	"video-downloader-bot/internal/config"
 	"video-downloader-bot/internal/logger"
 	"video-downloader-bot/internal/models"
+	"video-downloader-bot/internal/providers"
 	"video-downloader-bot/internal/telegram/helpers/errors"
 	"video-downloader-bot/internal/telegram/helpers/inlines"
 	"video-downloader-bot/internal/telegram/helpers/keyboards"
@@ -70,28 +71,44 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		ctx.Data["status_chat_id"] = ctx.EffectiveMessage.Chat.Id
 	}
 
-	result, err := videos.DownloadAndConvert(reqCtx, link)
+	res, err := b.manager.Download(reqCtx, link)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
-	defer func() { _ = os.Remove(filepath.Join(viper.GetString(config.TelegramBotVideoDownloadFolder), filepath.Base(result))) }()
-	defer func() { _ = os.Remove(filepath.Join(viper.GetString(config.TelegramBotVideoConvertedFolder), filepath.Base(result))) }()
 
-	var statusMsgID int64
-	if statusMsgID, ok = ctx.Data["status_message_id"].(int64); ok && statusMsgID != 0 {
-		chatID, _ := ctx.Data["status_chat_id"].(int64)
-		if _, err = bot.DeleteMessage(chatID, statusMsgID, nil); err != nil {
-			logger.WarnWithID(reqCtx, "Failed to delete status message: %v", err)
+	// Preview-URL result (URL-rewrite to an embed-fix domain): nothing to convert or upload — let Telegram render the link.
+	if res.Kind == providers.KindURL {
+		deleteStatusMessage(bot, ctx)
+		clean := links.DetrackLink(link)
+		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, 1))
+		if _, err = bot.SendMessage(ctx.EffectiveMessage.Chat.Id, res.URL, &gotgbot.SendMessageOpts{ReplyMarkup: previewKb}); err != nil {
+			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 		}
+		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s.", link, storage.GetUserString(ctx.EffectiveMessage.From))
+		if err = reactions.ReactWithTimer(bot, ctx, reactions.ReactionOK, 4); err != nil {
+			logger.WarnWithID(reqCtx, "Failed to set reaction: %v", err)
+		}
+		return nil
 	}
 
-	file, err := os.Open(result)
+	// File result: convert to H.264/AAC, then upload. Keep the status message until conversion
+	// succeeds, so a conversion failure can still be reported on it.
+	converted, err := videos.Convert(reqCtx, res.FilePath)
+	if err != nil {
+		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+	}
+	defer func() { _ = os.Remove(res.FilePath) }()
+	defer func() { _ = os.Remove(converted) }()
+
+	deleteStatusMessage(bot, ctx)
+
+	file, err := os.Open(converted)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
 	defer func() { _ = file.Close() }()
 
-	dims, err := ffmpeg.Probe(reqCtx, result)
+	dims, err := ffmpeg.Probe(reqCtx, converted)
 	if err != nil {
 		logger.WarnWithID(reqCtx, "ffprobe failed, sending without dimensions: %v", err)
 	}
@@ -127,7 +144,7 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		sendOpts.Height = dims.Height
 	}
 
-	if _, err = bot.SendVideo(ctx.EffectiveMessage.Chat.Id, gotgbot.InputFileByReader(filepath.Base(result), file), sendOpts); err != nil {
+	if _, err = bot.SendVideo(ctx.EffectiveMessage.Chat.Id, gotgbot.InputFileByReader(filepath.Base(converted), file), sendOpts); err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
 
@@ -238,20 +255,38 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		lang = settings.Language
 	}
 
-	result, err := videos.DownloadAndConvert(reqCtx, link)
+	res, err := b.manager.Download(reqCtx, link)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
-	defer func() { _ = os.Remove(filepath.Join(viper.GetString(config.TelegramBotVideoDownloadFolder), filepath.Base(result))) }()
-	defer func() { _ = os.Remove(filepath.Join(viper.GetString(config.TelegramBotVideoConvertedFolder), filepath.Base(result))) }()
 
-	file, err := os.Open(result)
+	// Preview-URL result (URL-rewrite to an embed-fix domain): edit the placeholder to the preview link
+	// instead of attaching media — Telegram renders the inline preview itself.
+	if res.Kind == providers.KindURL {
+		clean := links.DetrackLink(link)
+		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, 1))
+		if _, _, err = bot.EditMessageText(res.URL, &gotgbot.EditMessageTextOpts{InlineMessageId: placeholderMessageID, ReplyMarkup: previewKb}); err != nil {
+			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		}
+		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s via inline mode.", link, storage.GetUserString(&ctx.Update.ChosenInlineResult.From))
+		return nil
+	}
+
+	// File result: convert, push to the dump channel for a file_id, then swap it into the placeholder.
+	converted, err := videos.Convert(reqCtx, res.FilePath)
+	if err != nil {
+		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+	}
+	defer func() { _ = os.Remove(res.FilePath) }()
+	defer func() { _ = os.Remove(converted) }()
+
+	file, err := os.Open(converted)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
 	defer func() { _ = file.Close() }()
 
-	dims, err := ffmpeg.Probe(reqCtx, result)
+	dims, err := ffmpeg.Probe(reqCtx, converted)
 	if err != nil {
 		logger.WarnWithID(reqCtx, "ffprobe failed, sending without dimensions: %v", err)
 	}
@@ -264,7 +299,7 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		sendVideoOpts.Height = dims.Height
 	}
 
-	msg, err := bot.SendVideo(viper.GetInt64(config.TelegramBotVideoDumpChatID), gotgbot.InputFileByReader(filepath.Base(result), file), sendVideoOpts)
+	msg, err := bot.SendVideo(viper.GetInt64(config.TelegramBotVideoDumpChatID), gotgbot.InputFileByReader(filepath.Base(converted), file), sendVideoOpts)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
@@ -310,4 +345,16 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	logger.InfoWithID(reqCtx, "Video (%s) sent to %s via inline mode.", link, storage.GetUserString(&ctx.Update.ChosenInlineResult.From))
 
 	return nil
+}
+
+// deleteStatusMessage removes the "⏳ Downloading..." status message recorded in ctx.Data, if any.
+func deleteStatusMessage(bot *gotgbot.Bot, ctx *ext.Context) {
+	statusMsgID, ok := ctx.Data["status_message_id"].(int64)
+	if !ok || statusMsgID == 0 {
+		return
+	}
+	chatID, _ := ctx.Data["status_chat_id"].(int64)
+	if _, err := bot.DeleteMessage(chatID, statusMsgID, nil); err != nil {
+		logger.WarnWithID(req.FromExtContext(ctx), "Failed to delete status message: %v", err)
+	}
 }

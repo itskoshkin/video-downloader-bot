@@ -48,6 +48,24 @@ func IsSupportedLink(link string) bool {
 	}
 }
 
+// Platform returns the canonical platform name for a supported link ("x", "youtube",
+// "instagram", "tiktok"), or "" if unknown. Used to pick the provider chain from config.
+func Platform(link string) string {
+	clean := strings.ToLower(DetrackLink(link))
+	switch {
+	case strings.HasPrefix(clean, "x.com/"), strings.HasPrefix(clean, "twitter.com/"), strings.HasPrefix(clean, "fxtwitter.com/"):
+		return "x"
+	case strings.HasPrefix(clean, "youtube.com/"), strings.HasPrefix(clean, "youtu.be/"):
+		return "youtube"
+	case strings.HasPrefix(clean, "instagram.com/"), strings.HasPrefix(clean, "ddinstagram.com/"), strings.HasPrefix(clean, "kkinstagram.com/"):
+		return "instagram"
+	case strings.HasPrefix(clean, "tiktok.com/"), strings.HasPrefix(clean, "vm.tiktok.com/"), strings.HasPrefix(clean, "vt.tiktok.com/"):
+		return "tiktok"
+	default:
+		return ""
+	}
+}
+
 func HasLink(s string) (string, bool) {
 	if IsOnlyLink(s) {
 		return normalizeLink(s), true
@@ -154,7 +172,7 @@ func normalizeLink(link string) string {
 			return "https://" + host
 		}
 		return "https://" + host + path
-		
+
 	}
 }
 
