@@ -6,8 +6,10 @@ import (
 
 	"gorm.io/gorm"
 
+	"video-downloader-bot/internal/cleanup"
 	"video-downloader-bot/internal/config"
 	"video-downloader-bot/internal/logger"
+	"video-downloader-bot/internal/providers"
 	"video-downloader-bot/internal/services"
 	"video-downloader-bot/internal/storage"
 	"video-downloader-bot/internal/telegram"
@@ -43,6 +45,9 @@ func Load() *App {
 		logger.Fatal(err)
 	}
 
+	// Background cleanup of stale download/convert files (orphan safety net).
+	cleanup.StartSweeper()
+
 	// Databases/clients
 	db, err := postgres.NewInstance(config.PostgresConfig())
 	if err != nil {
@@ -56,8 +61,16 @@ func Load() *App {
 	userSvc := services.NewUserService(userStore)
 	setsSvc := services.NewSettingsService(userStore)
 
+	// Providers
+	manager := providers.NewManager(
+		providers.NewYtDlp(),
+		providers.NewHikerAPI(),
+		providers.NewAiograpi(),
+		providers.NewPreview(),
+	)
+
 	// Telegram
-	bot := telegram.NewBot(userSvc, setsSvc)
+	bot := telegram.NewBot(userSvc, setsSvc, manager)
 
 	return &App{bot: bot, db: db}
 }

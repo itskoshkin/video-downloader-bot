@@ -12,13 +12,15 @@ import (
 )
 
 type Config struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	Database string
-	SSLMode  string
-	LogLevel string
+	Host         string
+	Port         string
+	User         string
+	Password     string
+	Database     string
+	SSLMode      string
+	LogLevel     string
+	MaxIdleConns int
+	MaxOpenConns int
 }
 
 func NewInstance(cfg Config) (*gorm.DB, error) {
@@ -39,8 +41,8 @@ func NewInstance(cfg Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("GORM: failed to get underlying sql.DB: %v", err)
 	}
 
-	sqlDB.SetMaxIdleConns(2)
-	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
 
 	if err = sqlDB.Ping(); err != nil {
 		_ = sqlDB.Close()

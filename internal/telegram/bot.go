@@ -17,6 +17,8 @@ import (
 	"video-downloader-bot/internal/config"
 	"video-downloader-bot/internal/logger"
 	"video-downloader-bot/internal/models"
+	"video-downloader-bot/internal/providers"
+	"video-downloader-bot/internal/proxy"
 	"video-downloader-bot/internal/telegram/helpers/errors"
 	"video-downloader-bot/internal/telegram/middlewares/ratelimit"
 	"video-downloader-bot/internal/utils/text"
@@ -45,10 +47,13 @@ type Bot struct {
 	users       UserService
 	settings    SettingsService
 	rateLimiter *ratelimit.RateLimiter
+	manager     *providers.Manager
 }
 
-func NewBot(users UserService, settings SettingsService) *Bot {
-	bot, err := gotgbot.NewBot(viper.GetString(config.TelegramBotToken), nil)
+func NewBot(users UserService, settings SettingsService, manager *providers.Manager) *Bot {
+	bot, err := gotgbot.NewBot(viper.GetString(config.TelegramBotToken), &gotgbot.BotOpts{
+		BotClient: &gotgbot.BaseBotClient{Client: *proxy.Client(0)}, // route all Telegram HTTP through the SOCKS5 proxy when configured
+	})
 	if err != nil {
 		fmt.Println()
 		logger.Fatalf("gotgbot: failed to create new bot: %v", err)
@@ -74,7 +79,7 @@ func NewBot(users UserService, settings SettingsService) *Bot {
 		viper.GetInt(config.TelegramBotRateLimitPerDay),
 	)
 
-	return &Bot{bot: bot, dispatcher: dispatcher, updater: updater, users: users, settings: settings, rateLimiter: rateLimiter}
+	return &Bot{bot: bot, dispatcher: dispatcher, updater: updater, users: users, settings: settings, rateLimiter: rateLimiter, manager: manager}
 }
 
 func (b *Bot) RegisterHandlers() {
@@ -89,6 +94,7 @@ func (b *Bot) RegisterHandlers() {
 	// Callbacks
 	b.dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("settings:"), b.SettingsCallback))
 	b.dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("farewell:"), b.FarewellCallback))
+	b.dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("preview:"), b.PreviewCallback))
 
 	// Messages
 	b.dispatcher.AddHandler(handlers.NewMessage(message.Text, b.LinkHandler))

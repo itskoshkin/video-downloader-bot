@@ -7,6 +7,10 @@ app:
     file_path: "./application.log"
     file_mode: "overwrite" # "overwrite", "append" or "rotate"
     old_logs_folder: "logs/"
+    max_old_files: 10      # rotate retention: keep newest N archives (0 = unlimited)
+    max_old_size_mb: 0     # keep archives under this total size (0 = unlimited)
+    max_old_age_days: 30   # delete archives older than this many days (0 = unlimited)
+    gzip_old_logs: false   # gzip rotated archives
   database:
     host: "localhost"
     port: 5432
@@ -14,6 +18,8 @@ app:
     password: "password"
     database_name: "video-downloader-bot"
     ssl_mode: "disable"
+    max_idle_conns: 2
+    max_open_conns: 10
   telegram:
     bot:
       token: "token"
@@ -37,3 +43,36 @@ app:
     cookies_file: "./files/static/cookies.txt"
   ffmpeg:
     debug: false
+  proxy:
+    socks5: "" # SOCKS5 URL for byedpi/tunnel (e.g. socks5://127.0.0.1:1080); routes all bot HTTP + yt-dlp. Empty = direct. Env: APP_PROXY_SOCKS5
+  providers:
+    chains: # ordered provider names per platform; first success wins
+      instagram: [yt-dlp, aiograpi, hikerapi, preview]
+      # tiktok: [yt-dlp, tiktokez, preview]
+      default: [yt-dlp, preview]
+    preview: # fallback: on a failed download, rewrite the link to one of these embed-fix domains so Telegram renders a video preview
+      instagram_domains: # first entry = default, "preview not working?" cycles the rest
+        # - ddinstagram.com # Dead since April 2025 (NXDOMAIN)
+        # - fxstagram.com   # Dead shortly after (NXDOMAIN)
+        # - kkinstagram.com # Now 404 on root, moved to kkclip.com
+        # - kkclip.com      # Intrusive pop-ups & malware ads 🤡
+        # - instagramez.com # EmbedEZ (embedez.com), redirects to malvertising popunder (effectivegatecpm.com), premium "removes" it 🤡
+        - vxinstagram.com   # https://github.com/Lainmode/InstagramEmbed-vxinstagram
+        - eeinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/180#issuecomment-3285698107 / https://github.com/Wikidepia/InstaFix/issues/182#issue-3418754919
+        - uuinstagram.com   # Some Wikidepia/InstaFix instance
+        - zzinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/181#issuecomment-3507144482 / https://github.com/Knoppiix/InstaEmbedRouter
+      tiktok_domains:
+        # - vxtiktok.com # Down due to legal reasons
+        # - tiktokez.com # EmbedEZ (embedez.com)
+        # - kktiktok.com # Same kk- guys 🤡
+        - tnktok.com     # https://github.com/okdargy/fxtiktok
+        # - tfxktok.com  # Allan Fernando, closed source
+      reddit_domains:
+        - vxreddit.com   #
+        # - rxddit.com   # https://github.com/MinnDevelopment/fxreddit
+        # - rxyddit.com  # https://github.com/NurMarvin/sexy-reddit
+    aiograpi:
+      base_url: ""    # e.g. http://host:8625 — the aiograpi-rest sidecar
+      session_id: ""  # X-Session-ID header value (from POST /auth/login on the sidecar)
+    hikerapi:
+      api_key: ""

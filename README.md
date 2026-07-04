@@ -14,10 +14,10 @@ Telegram bot to download videos from X/Twitter, YouTube Shorts, Instagram and Ti
 - 1️⃣ Send a link (e.g. [youtu.be/lOwxBDDwdDU](https://youtu.be/lOwxBDDwdDU)) to bot, get video
 - 2️⃣ Send a link in any chat via inline mode, get video
 - 🔗 Supported links:
-  - <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/refs/heads/6.x/svgs/brands/x-twitter.svg" width="15" height="10" alt="X/Twitter"> X/Twitter (`https://x.com/<username>/status/<tweet_id>`, `twitter.com/...`, `fxtwitter.com/...`)
-  - <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/refs/heads/6.x/svgs/brands/youtube.svg" width="10" height="10" alt="YouTube">⠀YouTube (`youtube.com/shorts/<video_id>`, `youtube.com/watch?v=...`, `youtu.be/...`)
-  - <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/refs/heads/6.x/svgs/brands/instagram.svg" width="10" height="10" alt="Instagram">⠀Instagram (`instagram.com/reel/<reel_id>`, `ddinstagram.com/...`, `kkinstagram.com/...`)
-  - <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/refs/heads/6.x/svgs/brands/tiktok.svg" width="10" height="10" alt="TikTok">⠀TikTok (`tiktok.com/@<username>/video/<post_id>`, `tiktok.com/t/...`, `vt/vm.tiktok.com/...`)
+  - X/Twitter (`https://x.com/<username>/status/<tweet_id>`, `twitter.com/...`, `fxtwitter.com/...`)
+  - YouTube (`youtube.com/shorts/<video_id>`, `youtube.com/watch?v=...`, `youtu.be/...`)
+  - Instagram (`instagram.com/reel/<reel_id>`, `ddinstagram.com/...`, `kkinstagram.com/...`)
+  - TikTok (`tiktok.com/@<username>/video/<post_id>`, `tiktok.com/t/...`, `vt/vm.tiktok.com/...`)
 - ⚠️ Current limits:
   - 10 requests per minute and 100 requests/day (both in DM and inline)
   - Max video duration is 5 minutes
@@ -26,6 +26,7 @@ Telegram bot to download videos from X/Twitter, YouTube Shorts, Instagram and Ti
   - Bot language (`en`/`ru`/`ua`)
   - Caption style (only video, video and link, full)
   - Fast inline mode (don't wait for video title)
+  - Feedback type (reactions or replies)
 - ❔ Available commands - `/start`, `/help`, `/settings`
 
 ## Build & Run
@@ -99,6 +100,21 @@ Telegram bot to download videos from X/Twitter, YouTube Shorts, Instagram and Ti
 - [ ] Refactor flat `telegram` package with proper DI
 - [ ] Compress video if file size limit reached?
 - [ ] Retry on connection errors? (e.g. `context deadline exceeded`)
+- [ ] Add webhook?
+- [ ] Delete videos in dump channel
+- [ ] Add license
+- [ ] Add cleanup for rate-limiter (fix memory leak)
+- [ ] Add tests? (links.go)
+- [ ] Docker container healthcheck
+- [ ] Move app settings from YAML config to Postgres (currently the DB only stores bot data; config stays in `config.yaml`)
+
+<details>
+
+<summary><h3>Done</h3></summary>
+
+- [x] Fix square videos
+
+</details>
 
 ## Misc
 
@@ -120,6 +136,60 @@ Thus, bot needs a channel where it can "dump" videos to get that id
 2. Add bot to it
 3. Give it admin rights (send and delete posts, exactly)
 4. Get ID of channel and put it in config
+
+#### External services & fallbacks
+
+This bot runs in Russia, where Instagram and YouTube are blocked by DPI and some Instagram reels are auth-gated. Two **optional** external services help with that — you run them **yourself**, they are not part of this repo or image:
+
+**SOCKS5 proxy (DPI bypass, e.g. [byedpi](https://github.com/hufrea/byedpi))** — run a SOCKS5 proxy outside the bot and point the bot at it:
+
+```yaml
+app:
+  proxy:
+    socks5: "socks5://127.0.0.1:1080"   # or set env APP_PROXY_SOCKS5; empty = direct connection
+```
+
+When set, the bot routes **everything** through it — the Telegram Bot API client, `yt-dlp` (`--proxy`), and the HikerAPI / aiograpi HTTP clients.
+
+**Instagram fallback sidecar** — `aiograpi-rest` (the async fork of `instagrapi-rest`): a small HTTP service backed by a *throw-away* logged-in Instagram account, run outside this repo. Used when `yt-dlp` can't fetch a reel (private / auth-gated):
+
+```yaml
+app:
+  providers:
+    aiograpi:
+      base_url: "http://10.42.69.4:8625"   # empty = provider skipped
+      session_id: "<X-Session-ID>"
+```
+
+**HikerAPI (hosted, paid)** — same Instagram role as aiograpi but a hosted private API; set `app.providers.hikerapi.api_key` (empty = skipped).
+
+**Provider chain** — the order providers are tried per platform is `app.providers.chains`, e.g. `instagram: [yt-dlp, aiograpi, hikerapi, preview]`. The first provider to succeed wins; any provider without config is skipped, and `preview` (link-rewrite, no download) is the last resort.
+
+#### Keeping `yt-dlp` up to date
+
+`yt-dlp` breaks often — sites change their players and extractors need frequent updates, so a stale `yt-dlp` will eventually start failing downloads. Always update it **via pip** (never `yt-dlp -U` for a pip-based install).
+
+The Docker image pins the latest release at build time. To update later, run `pip install -U` **inside the running container** — no restart, no downtime, and the bot uses the new `yt-dlp` on the next download:
+
+```bash
+make update-ytdlp          # docker exec <container> pip install -U yt-dlp
+```
+
+To do this automatically, install a **weekly update** cron job on the host:
+
+```bash
+make enable-cron           # adds a weekly `docker exec ... pip install -U yt-dlp` to your crontab (see scripts/enable-cron.sh)
+```
+
+Defaults: Monday 04:00, container `video-downloader-bot`, log `/var/log/crons/video-downloader-bot-ytdlp-weekly-update.log` (override via `CONTAINER` / `CRON_SCHEDULE` / `CRON_LOG` env vars). Re-running is safe — it replaces the existing entry instead of duplicating it.
+
+Alternatively, the container can self-update `yt-dlp` **on start** — opt-in, off by default so normal restarts stay fast. Enable it per-run:
+
+```bash
+docker run -e YTDLP_SELFUPDATE=true ... video-downloader-bot
+```
+
+> Updates are best-effort: if pip can't reach PyPI (e.g. behind DPI), `yt-dlp` stays on the current version.
 
 #### `yt-dlp` impersonation
 
@@ -148,3 +218,25 @@ To fix this, place `cookies.txt` in `./files/static/` (or edit config to comply 
 See [yt-dlp wiki](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for instructions on how to get the cookies file
 
 TLDR – you have to register a *throw-away* accounts, open incognito window with YouTube/Instagram/Tiktok tabs, login in each tab, then use [browser extension](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) to export cookies as TXT file
+> ⚠️ **Use *throw-away* accounts**, otherwise you will first see [this](), then [this]().
+P.S. Fuck Zuck
+> 
+#### Non-root container
+
+The Docker image runs as a non-root user (uid **10001**). With bind mounts (`-v $PWD/files:/app/files`, `-v $PWD/logs:/app/logs`) the **host** `files/` and `logs/` dirs must be writable by that uid — e.g. `sudo chown -R 10001 files logs` on the host — otherwise the bot can't write downloads or logs. Updating `yt-dlp` inside a running non-root container needs root, so `make update-ytdlp` (and the weekly cron) run `docker exec -u root`.
+
+#### Error messages
+
+Download failures are classified before they reach the user: auth/age-gated content (login required, age-restricted, "log in for access", …) shows a localized 🔒 "behind a login/age gate" message instead of a raw `yt-dlp` dump, while the full error is still logged server-side.
+
+#### File cleanup
+
+A background sweeper deletes leftover files older than 30 min from the download and converted folders every 15 min (it skips `files/static/` and dotfiles), so orphaned fragments from failed or interrupted downloads don't pile up.
+
+#### Log retention
+
+Rotated app logs are pruned by count / total size / age (`app.log.max_old_files` / `max_old_size_mb` / `max_old_age_days`, defaults `10 / 0 / 30`, where `0` = unlimited) and can be gzipped (`app.log.gzip_old_logs`). Consecutive identical log lines are collapsed into a single `(previous message repeated N more time(s))`.
+
+#### Reconnect backoff & DB pool
+
+On Telegram polling errors the bot backs off with capped exponential delay (1s → 15s, reset after 2 min of stability) instead of hammering the API. The Postgres connection pool is tunable via `app.database.max_idle_conns` / `max_open_conns` (defaults `2 / 10`).

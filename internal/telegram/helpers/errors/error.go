@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -40,9 +42,38 @@ func DispatcherPanicHandler() func(b *gotgbot.Bot, ctx *ext.Context, r any) {
 	}
 }
 
+// UpdaterErrorHandler logs polling errors and throttles reconnect attempts with a capped
+// exponential backoff. gotgbot's polling loop calls this synchronously and then immediately
+// retries getUpdates (its built-in 1s sleep is skipped once this func is set), so without a
+// pause here a network outage hammers getUpdates in a tight loop and floods the log.
 func UpdaterErrorHandler() func(err error) {
+	var (
+		mu       sync.Mutex
+		failures int
+		lastAt   time.Time
+	)
+	const (
+		baseDelay  = time.Second
+		maxDelay   = 15 * time.Second // also bounds the shutdown wait if we're mid-backoff
+		resetAfter = 2 * time.Minute  // a gap this long means it recovered — start backoff over
+	)
 	return func(err error) {
 		logger.Error("gotgbot: updater: %v", err)
+
+		mu.Lock()
+		now := time.Now()
+		if !lastAt.IsZero() && now.Sub(lastAt) > resetAfter {
+			failures = 0
+		}
+		lastAt = now
+		delay := baseDelay << min(failures, 5) // 1s, 2s, 4s ... 32s
+		failures++
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+		mu.Unlock()
+
+		time.Sleep(delay)
 	}
 }
 
@@ -58,9 +89,15 @@ func HandleError(bot *gotgbot.Bot, ctx *ext.Context, languageCode string, messag
 		logger.ErrorWithFileID(req.FromExtContext(ctx), "full stderr:\n%s", stderr)
 	}
 
-	errorLine := "❌ " + message
-	if detail != "" {
-		errorLine += "\n" + detail
+	var errorLine string
+	if errs.IsAuthGated(err) {
+		// Age/login/private-gated media — show a human hint; do NOT leak the raw yt-dlp log to the user.
+		errorLine = s.Lang(languageCode).AuthGatedError
+	} else {
+		errorLine = "❌ " + message
+		if detail != "" {
+			errorLine += "\n" + detail
+		}
 	}
 
 	requestID, _ := ctx.Data["request_id"].(string)

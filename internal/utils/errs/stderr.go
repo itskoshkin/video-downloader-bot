@@ -65,3 +65,31 @@ func ShortError(err error) string {
 	}
 	return fmt.Sprintf("%s: %v", command, execErr.Err)
 }
+
+// authGatedMarkers are yt-dlp/extractor stderr fragments meaning the media sits behind an
+// age / login / private gate — unreachable without an authenticated session.
+var authGatedMarkers = []string{
+	"empty media response",
+	"login_required",
+	"requested content is not available",
+	"restricted video",
+	"age-restricted",
+	"sign in to confirm your age",
+	"log in for access",                // TikTok 18+
+	"this post may not be comfortable", // TikTok 18+
+}
+
+// IsAuthGated reports whether err comes from age/login/private-gated media that can't be
+// fetched without a logged-in session. Callers use it to show a human hint instead of raw stderr.
+func IsAuthGated(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error()) // ExecutionError.Error() already embeds the stderr
+	for _, m := range authGatedMarkers {
+		if strings.Contains(text, m) {
+			return true
+		}
+	}
+	return false
+}
