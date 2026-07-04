@@ -31,7 +31,7 @@ docker-restart:
 	docker restart $(IMAGE)
 
 update-ytdlp:
-	docker exec $(IMAGE) pip3 install -U --no-cache-dir --break-system-packages "yt-dlp[default,curl-cffi]"
+	docker exec -u root $(IMAGE) pip3 install -U --no-cache-dir --break-system-packages "yt-dlp[default,curl-cffi]"
 
 enable-cron:
 	./scripts/enable-cron.sh

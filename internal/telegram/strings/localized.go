@@ -45,6 +45,7 @@ type Strings struct {
 	UnsupportedLink     string
 	Downloading         string
 	FailedToProcessLink string
+	AuthGatedError      string
 
 	/* Inline */
 	InlineSendingHint         string
@@ -87,6 +88,7 @@ var localized = map[string]*Strings{
 		UnsupportedLink:             "Unsupported link, use /help to see supported list",
 		Downloading:                 "⏳ Downloading...",
 		FailedToProcessLink:         "Failed to process link",
+		AuthGatedError:              "🔒 This video is behind an age or login gate — it can't be downloaded without signing in.",
 		InlineSendingHint:           "🐾 Tap to send",
 		InlineResultPlaceholder:     "%s\n\n%s\n\n⏳ Message will be updated upon processing completion\n\n%s",
 		InlineButtonDownloading:     "⏳ Downloading...",
@@ -125,6 +127,7 @@ var localized = map[string]*Strings{
 		UnsupportedLink:             "Неподдерживаемая ссылка, отправь /help для списка",
 		Downloading:                 "⏳ Загружается...",
 		FailedToProcessLink:         "Не удалось обработать ссылку",
+		AuthGatedError:              "🔒 Видео за возрастным или логин-гейтом — его не скачать без входа в аккаунт.",
 		InlineSendingHint:           "🐾 Нажми для отправки",
 		InlineResultPlaceholder:     "%s\n\n%s\n\n⏳ Сообщение обновится после обработки\n\n%s",
 		InlineButtonDownloading:     "⏳ Загружается...",
@@ -163,6 +166,7 @@ var localized = map[string]*Strings{
 		UnsupportedLink:             "Непідтримуване посилання, надішли /help для списку",
 		Downloading:                 "⏳ Завантажується...",
 		FailedToProcessLink:         "Не вдалося обробити посилання",
+		AuthGatedError:              "🔒 Відео за віковим або лог-ін гейтом — його не завантажити без входу в акаунт.",
 		InlineSendingHint:           "🐾 Натисніть, щоб надіслати",
 		InlineResultPlaceholder:     "%s\n\n%s\n\n⏳ Повідомлення оновиться після обробки\n\n%s",
 		InlineButtonDownloading:     "⏳ Завантажується...",

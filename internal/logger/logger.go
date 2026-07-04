@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -24,6 +27,15 @@ var (
 	consoleLog   *log.Logger
 	fileLog      *log.Logger
 	jsonFileLog  *log.Logger
+
+	// Consecutive-message dedup: collapses identical back-to-back lines (e.g. a reconnect error
+	// repeating while the network is down) into one line + a "repeated N times" summary on the next
+	// distinct line. Pairs with the backoff in UpdaterErrorHandler to kill offline log spam.
+	dedupMu      sync.Mutex
+	dedupText    string
+	dedupColored string
+	dedupPlain   string
+	dedupCount   int
 )
 
 type Level int
@@ -106,7 +118,91 @@ func rotateLogFile(filePath, logsFolder string) {
 	newName := filepath.Join(logsFolder, name+"_"+time.Now().Format("2006-01-02_15-04-05")+ext)
 	if err := os.Rename(filePath, newName); err != nil {
 		log.Printf("failed to rotate log file: %v", err)
+		return
 	}
+
+	if viper.GetBool(config.LogGzipOldLogs) {
+		if err := gzipFile(newName); err != nil {
+			log.Printf("failed to gzip rotated log: %v", err)
+		}
+	}
+
+	pruneOldLogs(logsFolder)
+}
+
+// pruneOldLogs enforces retention on rotated archives in logsFolder: it keeps the newest ones within
+// the configured count / total-size / age limits (0 disables that limit) and deletes the oldest beyond them.
+func pruneOldLogs(logsFolder string) {
+	maxCount := viper.GetInt(config.LogMaxOldFiles)
+	maxSize := int64(viper.GetInt(config.LogMaxOldSizeMB)) * 1024 * 1024
+	maxAge := time.Duration(viper.GetInt(config.LogMaxOldAgeDays)) * 24 * time.Hour
+	if maxCount <= 0 && maxSize <= 0 && maxAge <= 0 {
+		return
+	}
+
+	entries, err := os.ReadDir(logsFolder)
+	if err != nil {
+		return
+	}
+
+	type archive struct {
+		path string
+		size int64
+		mod  time.Time
+	}
+	var archives []archive
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if n := e.Name(); !strings.HasSuffix(n, ".log") && !strings.HasSuffix(n, ".log.gz") {
+			continue // only touch rotated log archives
+		}
+		if info, err := e.Info(); err == nil {
+			archives = append(archives, archive{filepath.Join(logsFolder, e.Name()), info.Size(), info.ModTime()})
+		}
+	}
+	sort.Slice(archives, func(i, j int) bool { return archives[i].mod.After(archives[j].mod) }) // newest first
+
+	now := time.Now()
+	var kept int64
+	for i, a := range archives {
+		drop := (maxCount > 0 && i >= maxCount) ||
+			(maxAge > 0 && now.Sub(a.mod) > maxAge) ||
+			(maxSize > 0 && kept+a.size > maxSize)
+		if drop {
+			_ = os.Remove(a.path)
+		} else {
+			kept += a.size
+		}
+	}
+}
+
+// gzipFile compresses path to path+".gz" and removes the original on success.
+func gzipFile(path string) error {
+	in, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	out, err := os.Create(path + ".gz")
+	if err != nil {
+		_ = in.Close()
+		return err
+	}
+
+	gz := gzip.NewWriter(out)
+	_, copyErr := io.Copy(gz, in)
+	gzErr := gz.Close()
+	_ = out.Close()
+	_ = in.Close()
+
+	if copyErr != nil {
+		return copyErr
+	}
+	if gzErr != nil {
+		return gzErr
+	}
+	return os.Remove(path)
 }
 
 func GetWriters() io.Writer {
@@ -194,11 +290,28 @@ func prefixWithID(ctx context.Context, format string) string {
 	return format
 }
 
-func write(coloredLevel, plainLevel, text string) {
-	if consoleLog != nil {
-		consoleLog.Printf("%s %s %s", timestamp(), coloredLevel, text)
+func write(coloredLevel, plainLevel, message string) {
+	dedupMu.Lock()
+	if message == dedupText {
+		dedupCount++
+		dedupMu.Unlock()
+		return
 	}
-	writeFile(plainLevel, text)
+	sumColored, sumPlain, repeats := dedupColored, dedupPlain, dedupCount
+	dedupText, dedupColored, dedupPlain, dedupCount = message, coloredLevel, plainLevel, 0
+	dedupMu.Unlock()
+
+	if repeats > 0 {
+		emit(sumColored, sumPlain, fmt.Sprintf("(previous message repeated %d more time(s))", repeats))
+	}
+	emit(coloredLevel, plainLevel, message)
+}
+
+func emit(coloredLevel, plainLevel, message string) {
+	if consoleLog != nil {
+		consoleLog.Printf("%s %s %s", timestamp(), coloredLevel, message)
+	}
+	writeFile(plainLevel, message)
 }
 
 func writeFile(plainLevel, text string) {
@@ -218,6 +331,15 @@ type GlobalLogger struct{} // Wraps package-level functions for use as an inject
 func (GlobalLogger) Error(format string, v ...any) { Error(format, v...) }
 
 func Close() {
+	// Flush any pending dedup summary before the file is closed.
+	dedupMu.Lock()
+	sumColored, sumPlain, repeats := dedupColored, dedupPlain, dedupCount
+	dedupCount = 0
+	dedupMu.Unlock()
+	if repeats > 0 {
+		emit(sumColored, sumPlain, fmt.Sprintf("(previous message repeated %d more time(s))", repeats))
+	}
+
 	if logFile != nil {
 		_ = logFile.Close()
 	}

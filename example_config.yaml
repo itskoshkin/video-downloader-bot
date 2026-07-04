@@ -7,6 +7,10 @@ app:
     file_path: "./application.log"
     file_mode: "overwrite" # "overwrite", "append" or "rotate"
     old_logs_folder: "logs/"
+    max_old_files: 10      # rotate retention: keep newest N archives (0 = unlimited)
+    max_old_size_mb: 0     # keep archives under this total size (0 = unlimited)
+    max_old_age_days: 30   # delete archives older than this many days (0 = unlimited)
+    gzip_old_logs: false   # gzip rotated archives
   database:
     host: "localhost"
     port: 5432
@@ -14,6 +18,8 @@ app:
     password: "password"
     database_name: "video-downloader-bot"
     ssl_mode: "disable"
+    max_idle_conns: 2
+    max_open_conns: 10
   telegram:
     bot:
       token: "token"
@@ -59,6 +65,10 @@ app:
         # - kktiktok.com # Same kk- guys 🤡
         - tnktok.com     # https://github.com/okdargy/fxtiktok
         # - tfxktok.com  # Allan Fernando, closed source
+      reddit_domains:
+        - vxreddit.com   #
+        # - rxddit.com   # https://github.com/MinnDevelopment/fxreddit
+        # - rxyddit.com  # https://github.com/NurMarvin/sexy-reddit
     aiograpi:
       base_url: ""    # e.g. http://host:8625 — the aiograpi-rest sidecar
       session_id: ""  # X-Session-ID header value (from POST /auth/login on the sidecar)

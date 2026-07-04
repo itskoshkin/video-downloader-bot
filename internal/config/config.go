@@ -13,20 +13,26 @@ import (
 )
 
 const (
-	LogLevel       = "app.log.level"           // string ("DEBUG", "INFO", "WARN", "ERROR")
-	LogFormat      = "app.log.log_format"      // string ("text" or "json")
-	LogToConsole   = "app.log.log2console"     // bool
-	LogToFile      = "app.log.log2file"        // bool
-	LogFilePath    = "app.log.file_path"       // string (path)
-	LogFileMode    = "app.log.file_mode"       // string ("append", "overwrite", "rotate")
-	LogFilesFolder = "app.log.old_logs_folder" // string (path)
+	LogLevel         = "app.log.level"            // string ("DEBUG", "INFO", "WARN", "ERROR")
+	LogFormat        = "app.log.log_format"       // string ("text" or "json")
+	LogToConsole     = "app.log.log2console"      // bool
+	LogToFile        = "app.log.log2file"         // bool
+	LogFilePath      = "app.log.file_path"        // string (path)
+	LogFileMode      = "app.log.file_mode"        // string ("append", "overwrite", "rotate")
+	LogFilesFolder   = "app.log.old_logs_folder"  // string (path)
+	LogMaxOldFiles   = "app.log.max_old_files"    // int (retention: 0 = unlimited)
+	LogMaxOldSizeMB  = "app.log.max_old_size_mb"  // int (retention: 0 = unlimited, total archive size)
+	LogMaxOldAgeDays = "app.log.max_old_age_days" // int (retention: 0 = unlimited)
+	LogGzipOldLogs   = "app.log.gzip_old_logs"    // bool (gzip rotated archives)
 
-	DatabaseHost     = "app.database.host"          // string
-	DatabasePort     = "app.database.port"          // int
-	DatabaseUser     = "app.database.user"          // string
-	DatabasePassword = "app.database.password"      // string
-	DatabaseName     = "app.database.database_name" // string
-	DatabaseSslMode  = "app.database.ssl_mode"      // string
+	DatabaseHost         = "app.database.host"           // string
+	DatabasePort         = "app.database.port"           // int
+	DatabaseUser         = "app.database.user"           // string
+	DatabasePassword     = "app.database.password"       // string
+	DatabaseName         = "app.database.database_name"  // string
+	DatabaseSslMode      = "app.database.ssl_mode"       // string
+	DatabaseMaxIdleConns = "app.database.max_idle_conns" // int
+	DatabaseMaxOpenConns = "app.database.max_open_conns" // int
 
 	TelegramBotLibDebug             = "app.telegram.gotgbot_debug"             // bool
 	TelegramBotToken                = "app.telegram.bot.token"                 // string
@@ -99,7 +105,9 @@ func ValidateConfigFields() error {
 	}
 	var defaults = map[string]any{ // Will be set if not present, overwrites above required/dependent
 		/* Log */ LogLevel: "INFO", LogFormat: "text", LogToConsole: true, LogToFile: true, LogFilePath: "application.log", LogFileMode: "append",
+		LogMaxOldFiles: 10, LogMaxOldSizeMB: 0, LogMaxOldAgeDays: 30, LogGzipOldLogs: false,
 		/* Postgres */ DatabaseHost: "localhost", DatabasePort: 5432, DatabaseUser: "postgres", DatabaseName: "video-downloader-bot", DatabaseSslMode: "disable",
+		DatabaseMaxIdleConns: 2, DatabaseMaxOpenConns: 10,
 		/* Telegram */ TelegramBotLongPollingTimeout: 9, TelegramBotHttpClientTimeout: 10,
 		TelegramBotVideoDownloadFolder: "./files/downloads", TelegramBotVideoConvertedFolder: "./files/converted",
 		TelegramBotRateLimitPerMinute: 10, TelegramBotRateLimitBurst: 3, TelegramBotRateLimitPerDay: 100,
@@ -192,13 +200,15 @@ func isEmptyValue(key string) bool {
 
 func PostgresConfig() postgres.Config {
 	return postgres.Config{
-		Host:     viper.GetString(DatabaseHost),
-		Port:     viper.GetString(DatabasePort),
-		User:     viper.GetString(DatabaseUser),
-		Password: viper.GetString(DatabasePassword),
-		Database: viper.GetString(DatabaseName),
-		SSLMode:  viper.GetString(DatabaseSslMode),
-		LogLevel: viper.GetString(LogLevel),
+		Host:         viper.GetString(DatabaseHost),
+		Port:         viper.GetString(DatabasePort),
+		User:         viper.GetString(DatabaseUser),
+		Password:     viper.GetString(DatabasePassword),
+		Database:     viper.GetString(DatabaseName),
+		SSLMode:      viper.GetString(DatabaseSslMode),
+		LogLevel:     viper.GetString(LogLevel),
+		MaxIdleConns: viper.GetInt(DatabaseMaxIdleConns),
+		MaxOpenConns: viper.GetInt(DatabaseMaxOpenConns),
 	}
 }
 

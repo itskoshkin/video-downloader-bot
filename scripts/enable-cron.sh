@@ -18,7 +18,7 @@ if [ -z "$DOCKER_BIN" ]; then
 fi
 
 MARKER="# ytdlp-weekly-update:${CONTAINER}" # Inline marker makes the entry findable/replaceable
-CRON_LINE="${CRON_SCHEDULE} ${DOCKER_BIN} exec ${CONTAINER} pip3 install -U --no-cache-dir --break-system-packages 'yt-dlp[default,curl-cffi]' >> ${CRON_LOG} 2>&1 ${MARKER}"
+CRON_LINE="${CRON_SCHEDULE} ${DOCKER_BIN} exec -u root ${CONTAINER} pip3 install -U --no-cache-dir --break-system-packages 'yt-dlp[default,curl-cffi]' >> ${CRON_LOG} 2>&1 ${MARKER}"
 
 ( crontab -l 2>/dev/null | grep -vF "$MARKER" || true; echo "$CRON_LINE" ) | crontab - # Drop any previous entry for this container, then append the current one
 

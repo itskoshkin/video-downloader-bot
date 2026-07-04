@@ -189,3 +189,23 @@ To fix this, place `cookies.txt` in `./files/static/` (or edit config to comply 
 See [yt-dlp wiki](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for instructions on how to get the cookies file
 
 TLDR – you have to register a *throw-away* accounts, open incognito window with YouTube/Instagram/Tiktok tabs, login in each tab, then use [browser extension](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) to export cookies as TXT file
+
+#### Non-root container
+
+The Docker image runs as a non-root user (uid **10001**). With bind mounts (`-v $PWD/files:/app/files`, `-v $PWD/logs:/app/logs`) the **host** `files/` and `logs/` dirs must be writable by that uid — e.g. `sudo chown -R 10001 files logs` on the host — otherwise the bot can't write downloads or logs. Updating `yt-dlp` inside a running non-root container needs root, so `make update-ytdlp` (and the weekly cron) run `docker exec -u root`.
+
+#### Error messages
+
+Download failures are classified before they reach the user: auth/age-gated content (login required, age-restricted, "log in for access", …) shows a localized 🔒 "behind a login/age gate" message instead of a raw `yt-dlp` dump, while the full error is still logged server-side.
+
+#### File cleanup
+
+A background sweeper deletes leftover files older than 30 min from the download and converted folders every 15 min (it skips `files/static/` and dotfiles), so orphaned fragments from failed or interrupted downloads don't pile up.
+
+#### Log retention
+
+Rotated app logs are pruned by count / total size / age (`app.log.max_old_files` / `max_old_size_mb` / `max_old_age_days`, defaults `10 / 0 / 30`, where `0` = unlimited) and can be gzipped (`app.log.gzip_old_logs`). Consecutive identical log lines are collapsed into a single `(previous message repeated N more time(s))`.
+
+#### Reconnect backoff & DB pool
+
+On Telegram polling errors the bot backs off with capped exponential delay (1s → 15s, reset after 2 min of stability) instead of hammering the API. The Postgres connection pool is tunable via `app.database.max_idle_conns` / `max_open_conns` (defaults `2 / 10`).

@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"video-downloader-bot/internal/cleanup"
 	"video-downloader-bot/internal/config"
 	"video-downloader-bot/internal/logger"
 	"video-downloader-bot/internal/providers"
@@ -43,6 +44,9 @@ func Load() *App {
 	if err != nil {
 		logger.Fatal(err)
 	}
+
+	// Background cleanup of stale download/convert files (orphan safety net).
+	cleanup.StartSweeper()
 
 	// Databases/clients
 	db, err := postgres.NewInstance(config.PostgresConfig())
