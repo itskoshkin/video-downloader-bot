@@ -18,6 +18,7 @@ import (
 	"video-downloader-bot/internal/logger"
 	"video-downloader-bot/internal/models"
 	"video-downloader-bot/internal/providers"
+	"video-downloader-bot/internal/proxy"
 	"video-downloader-bot/internal/telegram/helpers/errors"
 	"video-downloader-bot/internal/telegram/middlewares/ratelimit"
 	"video-downloader-bot/internal/utils/text"
@@ -50,7 +51,9 @@ type Bot struct {
 }
 
 func NewBot(users UserService, settings SettingsService, manager *providers.Manager) *Bot {
-	bot, err := gotgbot.NewBot(viper.GetString(config.TelegramBotToken), nil)
+	bot, err := gotgbot.NewBot(viper.GetString(config.TelegramBotToken), &gotgbot.BotOpts{
+		BotClient: &gotgbot.BaseBotClient{Client: *proxy.Client(0)}, // route all Telegram HTTP through the SOCKS5 proxy when configured
+	})
 	if err != nil {
 		fmt.Println()
 		logger.Fatalf("gotgbot: failed to create new bot: %v", err)

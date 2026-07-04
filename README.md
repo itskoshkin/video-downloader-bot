@@ -136,6 +136,34 @@ Thus, bot needs a channel where it can "dump" videos to get that id
 3. Give it admin rights (send and delete posts, exactly)
 4. Get ID of channel and put it in config
 
+#### External services & fallbacks
+
+This bot runs in Russia, where Instagram and YouTube are blocked by DPI and some Instagram reels are auth-gated. Two **optional** external services help with that — you run them **yourself**, they are not part of this repo or image:
+
+**SOCKS5 proxy (DPI bypass, e.g. [byedpi](https://github.com/hufrea/byedpi))** — run a SOCKS5 proxy outside the bot and point the bot at it:
+
+```yaml
+app:
+  proxy:
+    socks5: "socks5://127.0.0.1:1080"   # or set env APP_PROXY_SOCKS5; empty = direct connection
+```
+
+When set, the bot routes **everything** through it — the Telegram Bot API client, `yt-dlp` (`--proxy`), and the HikerAPI / aiograpi HTTP clients.
+
+**Instagram fallback sidecar** — `aiograpi-rest` (the async fork of `instagrapi-rest`): a small HTTP service backed by a *throw-away* logged-in Instagram account, run outside this repo. Used when `yt-dlp` can't fetch a reel (private / auth-gated):
+
+```yaml
+app:
+  providers:
+    aiograpi:
+      base_url: "http://10.42.69.4:8625"   # empty = provider skipped
+      session_id: "<X-Session-ID>"
+```
+
+**HikerAPI (hosted, paid)** — same Instagram role as aiograpi but a hosted private API; set `app.providers.hikerapi.api_key` (empty = skipped).
+
+**Provider chain** — the order providers are tried per platform is `app.providers.chains`, e.g. `instagram: [yt-dlp, aiograpi, hikerapi, preview]`. The first provider to succeed wins; any provider without config is skipped, and `preview` (link-rewrite, no download) is the last resort.
+
 #### Keeping `yt-dlp` up to date
 
 `yt-dlp` breaks often — sites change their players and extractors need frequent updates, so a stale `yt-dlp` will eventually start failing downloads. Always update it **via pip** (never `yt-dlp -U` for a pip-based install).

@@ -56,6 +56,8 @@ const (
 
 	FfmpegDebug = "app.ffmpeg.debug" // bool
 
+	ProxySocks5 = "app.proxy.socks5" // string (SOCKS5 URL for byedpi/tunnel; empty = direct)
+
 	ProvidersChainDefault   = "app.providers.chains.default"            // []string (ordered provider names)
 	PreviewInstagramDomains = "app.providers.preview.instagram_domains" // []string (embed-fix domains, primary first)
 	PreviewTiktokDomains    = "app.providers.preview.tiktok_domains"    // []string (embed-fix domains, primary first)

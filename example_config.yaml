@@ -43,6 +43,8 @@ app:
     cookies_file: "./files/static/cookies.txt"
   ffmpeg:
     debug: false
+  proxy:
+    socks5: "" # SOCKS5 URL for byedpi/tunnel (e.g. socks5://127.0.0.1:1080); routes all bot HTTP + yt-dlp. Empty = direct. Env: APP_PROXY_SOCKS5
   providers:
     chains: # ordered provider names per platform; first success wins
       instagram: [yt-dlp, aiograpi, hikerapi, preview]

@@ -17,6 +17,7 @@ import (
 
 	"video-downloader-bot/internal/config"
 	"video-downloader-bot/internal/logger"
+	"video-downloader-bot/internal/proxy"
 	"video-downloader-bot/internal/utils/links"
 )
 
@@ -33,7 +34,7 @@ type hikerAPI struct {
 const hikerBaseURL = "https://api.hikerapi.com"
 
 func NewHikerAPI() Downloader {
-	return &hikerAPI{client: &http.Client{Timeout: 2 * time.Minute}}
+	return &hikerAPI{client: proxy.Client(2 * time.Minute)}
 }
 
 func (*hikerAPI) Name() string { return "hikerapi" }

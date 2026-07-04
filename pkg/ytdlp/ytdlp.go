@@ -58,6 +58,9 @@ func FetchMetadata(ctx context.Context, link string) (*Metadata, error) {
 	if viper.GetBool(config.YtDlpUseCookies) {
 		args = append(args, "--cookies", viper.GetString(config.YtDlpCookiesFile)) // Load cookies from a file and use them for authenticated requests, needed when anonymous access is rate-limited or blocked because of age restrictions
 	}
+	if p := strings.TrimSpace(viper.GetString(config.ProxySocks5)); p != "" {
+		args = append(args, "--proxy", p) // Route through the SOCKS5 proxy (byedpi/tunnel) for DPI bypass
+	}
 	args = append(args, link)
 
 	logger.DebugWithID(ctx, "Fetching video metadata from \"%s\"...", link)
@@ -86,13 +89,16 @@ func DownloadVideo(ctx context.Context, link string) (string, error) {
 		"-f", "bv*+ba/b", // Choose format: best available video and available audio or fallback to best single file if separate video/audio is not available
 		"--merge-output-format", "mp4", // f video and audio are downloaded separately, merge them into an MP4 container
 		"-o", viper.GetString(config.TelegramBotVideoDownloadFolder) + "%(id)s.%(ext)s", // Output file name template ("%(id)s" is the media ID and "%(ext)s" is the resulting file extension)
-		"--no-playlist", // Download only the single media item, not the whole playlist/thread/collection
-		"--no-update",   // Never check for updates (silences the periodic "version is out of date" warning); updates are handled via pip only
+		"--no-playlist",                                                                     // Download only the single media item, not the whole playlist/thread/collection
+		"--no-update",                                                                       // Never check for updates (silences the periodic "version is out of date" warning); updates are handled via pip only
 		"--max-filesize", fmt.Sprintf("%dM", viper.GetInt(config.TelegramBotMaxFileSizeMB)), // Skip download if filesize exceeds limit
 		"--match-filter", fmt.Sprintf("duration<=?%d", viper.GetInt(config.TelegramBotMaxVideoDuration)), // Skip download if duration exceeds limit (? = skip check if duration is unknown)
 	}
 	if viper.GetBool(config.YtDlpUseCookies) {
 		args = append(args, "--cookies", viper.GetString(config.YtDlpCookiesFile)) // Load cookies from a file and use them for authenticated requests, needed when anonymous access is rate-limited or blocked because of age restrictions
+	}
+	if p := strings.TrimSpace(viper.GetString(config.ProxySocks5)); p != "" {
+		args = append(args, "--proxy", p) // Route through the SOCKS5 proxy (byedpi/tunnel) for DPI bypass
 	}
 	args = append(args, link)
 

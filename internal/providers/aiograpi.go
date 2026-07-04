@@ -16,6 +16,7 @@ import (
 
 	"video-downloader-bot/internal/config"
 	"video-downloader-bot/internal/logger"
+	"video-downloader-bot/internal/proxy"
 	"video-downloader-bot/internal/utils/links"
 )
 
@@ -30,7 +31,7 @@ type aiograpi struct {
 }
 
 func NewAiograpi() Downloader {
-	return &aiograpi{client: &http.Client{Timeout: 2 * time.Minute}}
+	return &aiograpi{client: proxy.Client(2 * time.Minute)}
 }
 
 func (*aiograpi) Name() string { return "aiograpi" }
