@@ -39,7 +39,7 @@ app:
     debug: false
   providers:
     chains: # ordered provider names per platform; first success wins
-      instagram: [yt-dlp, instagrapi, hikerapi, preview]
+      instagram: [yt-dlp, aiograpi, hikerapi, preview]
       # tiktok: [yt-dlp, tiktokez, preview]
       default: [yt-dlp, preview]
     preview: # fallback: on a failed download, rewrite the link to one of these embed-fix domains so Telegram renders a video preview
@@ -59,7 +59,8 @@ app:
         # - kktiktok.com # Same kk- guys 🤡
         - tnktok.com     # https://github.com/okdargy/fxtiktok
         # - tfxktok.com  # Allan Fernando, closed source
-    instagrapi:
-      base_url: ""
+    aiograpi:
+      base_url: ""    # e.g. http://host:8625 — the aiograpi-rest sidecar
+      session_id: ""  # X-Session-ID header value (from POST /auth/login on the sidecar)
     hikerapi:
       api_key: ""

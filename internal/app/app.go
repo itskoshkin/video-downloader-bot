@@ -61,7 +61,7 @@ func Load() *App {
 	manager := providers.NewManager(
 		providers.NewYtDlp(),
 		providers.NewHikerAPI(),
-		providers.NewInstagrapi(),
+		providers.NewAiograpi(),
 		providers.NewPreview(),
 	)
 

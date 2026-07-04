@@ -10,7 +10,7 @@ type Kind int
 
 const (
 	// KindFile: FilePath points to a downloaded local file that still needs
-	// converting and uploading (yt-dlp, hikerapi, instagrapi).
+	// converting and uploading (yt-dlp, hikerapi, aiograpi).
 	KindFile Kind = iota
 	// KindURL: URL is a ready link that Telegram renders as an inline preview;
 	// nothing is downloaded or uploaded on our side (URL-rewrite preview).

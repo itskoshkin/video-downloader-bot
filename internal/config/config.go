@@ -54,7 +54,8 @@ const (
 	PreviewInstagramDomains = "app.providers.preview.instagram_domains" // []string (embed-fix domains, primary first)
 	PreviewTiktokDomains    = "app.providers.preview.tiktok_domains"    // []string (embed-fix domains, primary first)
 	HikerApiKey             = "app.providers.hikerapi.api_key"          // string
-	InstagrapiBaseURL       = "app.providers.instagrapi.base_url"       // string
+	AiograpiBaseURL         = "app.providers.aiograpi.base_url"         // string
+	AiograpiSessionID       = "app.providers.aiograpi.session_id"       // string (X-Session-ID header for the sidecar)
 )
 
 // ProvidersChainKey builds the config key for a platform's provider chain, e.g. "app.providers.chains.instagram".
@@ -106,7 +107,7 @@ func ValidateConfigFields() error {
 		/* External tools */ YtDlpDebug: false, FfmpegDebug: false,
 		/* Providers */
 		ProvidersChainDefault:          []string{"yt-dlp", "preview"},
-		ProvidersChainKey("instagram"): []string{"yt-dlp", "instagrapi", "hikerapi", "preview"},
+		ProvidersChainKey("instagram"): []string{"yt-dlp", "aiograpi", "hikerapi", "preview"},
 		PreviewInstagramDomains:        []string{"vxinstagram.com", "eeinstagram.com", "uuinstagram.com", "zzinstagram.com"},
 		PreviewTiktokDomains:           []string{"tnktok.com"},
 	}
