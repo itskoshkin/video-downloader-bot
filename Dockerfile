@@ -14,7 +14,8 @@ RUN CGO_ENABLED=0 go build -ldflags="$GO_BUILD_FLAGS" -o $BIN_NAME $MAIN_PATH
 
 FROM alpine:3.21
 
-RUN apk add --no-cache ffmpeg python3 py3-pip && pip3 install -U --break-system-packages "yt-dlp[default,curl-cffi]"
+# --pre pulls the yt-dlp nightly channel — extractor fixes land there days before a stable release
+RUN apk add --no-cache ffmpeg python3 py3-pip && pip3 install -U --pre --break-system-packages "yt-dlp[default,curl-cffi]"
 
 WORKDIR /app
 COPY --from=builder /build/video-downloader-bot .
