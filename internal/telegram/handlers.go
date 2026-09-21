@@ -80,7 +80,7 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if res.Kind == providers.KindURL {
 		deleteStatusMessage(bot, ctx)
 		clean := links.DetrackLink(link)
-		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, 1))
+		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, res.Index+1))
 		if _, err = bot.SendMessage(ctx.EffectiveMessage.Chat.Id, res.URL, &gotgbot.SendMessageOpts{ReplyMarkup: previewKb}); err != nil {
 			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 		}
@@ -264,7 +264,7 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	// instead of attaching media — Telegram renders the inline preview itself.
 	if res.Kind == providers.KindURL {
 		clean := links.DetrackLink(link)
-		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, 1))
+		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, res.Index+1))
 		if _, _, err = bot.EditMessageText(res.URL, &gotgbot.EditMessageTextOpts{InlineMessageId: placeholderMessageID, ReplyMarkup: previewKb}); err != nil {
 			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 		}

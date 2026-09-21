@@ -61,6 +61,9 @@ const (
 	ProvidersChainDefault   = "app.providers.chains.default"            // []string (ordered provider names)
 	PreviewInstagramDomains = "app.providers.preview.instagram_domains" // []string (embed-fix domains, primary first)
 	PreviewTiktokDomains    = "app.providers.preview.tiktok_domains"    // []string (embed-fix domains, primary first)
+	PreviewProbeEnabled     = "app.providers.preview.probe.enabled"     // bool (probe embed domains server-side for a working one before sending; also warms lazy services)
+	PreviewProbeTimeout     = "app.providers.preview.probe.timeout"     // duration (per-domain fetch timeout)
+	PreviewProbeBudget      = "app.providers.preview.probe.budget"      // duration (overall cap across all domain probes)
 	HikerApiKey             = "app.providers.hikerapi.api_key"          // string
 	AiograpiBaseURL         = "app.providers.aiograpi.base_url"         // string
 	AiograpiSessionID       = "app.providers.aiograpi.session_id"       // string (X-Session-ID header for the sidecar)
@@ -118,8 +121,11 @@ func ValidateConfigFields() error {
 		/* Providers */
 		ProvidersChainDefault:          []string{"yt-dlp", "preview"},
 		ProvidersChainKey("instagram"): []string{"yt-dlp", "aiograpi", "hikerapi", "preview"},
-		PreviewInstagramDomains:        []string{"vxinstagram.com", "eeinstagram.com", "uuinstagram.com", "zzinstagram.com"},
+		PreviewInstagramDomains:        []string{"eeinstagram.com", "uuinstagram.com", "zzinstagram.com", "kirkstagram.com"}, // vxinstagram.com disabled: died somewhere in August '26 (last Wayback 200 on 10.08, still up 27.08, confirmed 502 on 21.09); DNS resolves, upstream unmaintained since Apr '26
 		PreviewTiktokDomains:           []string{"tnktok.com"},
+		PreviewProbeEnabled:            true,
+		PreviewProbeTimeout:            "5s",
+		PreviewProbeBudget:             "20s",
 	}
 
 	for k, v := range defaults {

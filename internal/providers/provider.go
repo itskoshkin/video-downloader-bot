@@ -22,6 +22,7 @@ type Result struct {
 	Kind     Kind
 	FilePath string // set when Kind == KindFile
 	URL      string // set when Kind == KindURL
+	Index    int    // set when Kind == KindURL: index of the chosen preview domain, so the cycle button starts after it
 }
 
 // Sentinel errors let the chain decide whether to fall through to the next provider.

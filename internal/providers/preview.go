@@ -1,14 +1,19 @@
 package providers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 
 	"video-downloader-bot/internal/config"
+	"video-downloader-bot/internal/proxy"
 	"video-downloader-bot/internal/utils/links"
 )
 
@@ -36,12 +41,92 @@ func (*previewProvider) Applicable(link string) bool {
 	}
 }
 
-func (*previewProvider) Download(_ context.Context, link string) (*Result, error) {
-	rewritten, ok := PreviewURL(link, 0)
-	if !ok {
+func (*previewProvider) Download(ctx context.Context, link string) (*Result, error) {
+	domains := PreviewDomains(links.Platform(link))
+	if len(domains) == 0 {
 		return nil, ErrNotApplicable
 	}
-	return &Result{Kind: KindURL, URL: rewritten}, nil
+	// Probe the domains for one that actually yields a video embed; the fetch also warms lazy
+	// services (InstaFix answers "Post not found" until it has fetched the reel). Falls back to
+	// index 0 when nothing validates — Telegram may still render it, and the "preview not
+	// working?" button lets the user cycle the rest by hand.
+	idx := probeWorkingDomain(ctx, link, domains)
+	rewritten, err := swapHost(link, domains[idx])
+	if err != nil {
+		return nil, ErrNotApplicable
+	}
+	return &Result{Kind: KindURL, URL: rewritten, Index: idx}, nil
+}
+
+// telegramPreviewUA mimics Telegram's link-preview fetcher, so embed services return the same
+// og: markup Telegram will see (several of them serve og-tags only to known preview bots).
+const telegramPreviewUA = "TelegramBot (like TwitterBot)"
+
+// probeWorkingDomain fetches each candidate embed URL and returns the index of the first that
+// exposes an og:video tag. The fetch doubles as a warm-up for lazy services, so a second pass
+// (after a short delay) catches domains that were still fetching on the first one. Returns 0
+// when probing is disabled or nothing validates within the budget.
+func probeWorkingDomain(ctx context.Context, link string, domains []string) int {
+	if !viper.GetBool(config.PreviewProbeEnabled) {
+		return 0
+	}
+	perFetch := viper.GetDuration(config.PreviewProbeTimeout)
+	if perFetch <= 0 {
+		perFetch = 5 * time.Second
+	}
+	budget := viper.GetDuration(config.PreviewProbeBudget)
+	if budget <= 0 {
+		budget = 20 * time.Second
+	}
+	deadline := time.Now().Add(budget)
+	client := proxy.Client(perFetch)
+
+	const (
+		rounds    = 2                       // first pass warms lazy services, second catches them warmed
+		warmDelay = 1500 * time.Millisecond // grace period between passes for the warm-up to finish
+	)
+	for round := 0; round < rounds; round++ {
+		for i, d := range domains {
+			if ctx.Err() != nil || time.Now().After(deadline) {
+				return 0
+			}
+			u, err := swapHost(link, d)
+			if err != nil {
+				continue
+			}
+			if hasVideoEmbed(ctx, client, u) {
+				return i
+			}
+		}
+		if round+1 < rounds {
+			select {
+			case <-time.After(warmDelay):
+			case <-ctx.Done():
+				return 0
+			}
+		}
+	}
+	return 0
+}
+
+// hasVideoEmbed reports whether rawURL returns an HTML page carrying an og:video meta tag.
+func hasVideoEmbed(ctx context.Context, client *http.Client, rawURL string) bool {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", telegramPreviewUA)
+	req.Header.Set("Accept", "text/html")
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024)) // og: tags live in <head>
+	return bytes.Contains(body, []byte("og:video"))
 }
 
 // PreviewDomains returns the configured embed-fix domains for a platform (primary first).

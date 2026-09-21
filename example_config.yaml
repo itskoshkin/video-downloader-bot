@@ -57,10 +57,11 @@ app:
         # - kkinstagram.com # Now 404 on root, moved to kkclip.com
         # - kkclip.com      # Intrusive pop-ups & malware ads 🤡
         # - instagramez.com # EmbedEZ (embedez.com), redirects to malvertising popunder (effectivegatecpm.com), premium "removes" it 🤡
-        - vxinstagram.com   # https://github.com/Lainmode/InstagramEmbed-vxinstagram
+        # - vxinstagram.com # Disabled: died somewhere in August '26 (502; DNS still resolves). A Jun '26 outage was fixed in 2 days, so re-check before deleting
         - eeinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/180#issuecomment-3285698107 / https://github.com/Wikidepia/InstaFix/issues/182#issue-3418754919
         - uuinstagram.com   # Some Wikidepia/InstaFix instance
         - zzinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/181#issuecomment-3507144482 / https://github.com/Knoppiix/InstaEmbedRouter
+        - kirkstagram.com   # added 21.09.2026
       tiktok_domains:
         # - vxtiktok.com # Down due to legal reasons
         # - tiktokez.com # EmbedEZ (embedez.com)
@@ -71,6 +72,10 @@ app:
         - vxreddit.com   #
         # - rxddit.com   # https://github.com/MinnDevelopment/fxreddit
         # - rxyddit.com  # https://github.com/NurMarvin/sexy-reddit
+      probe: # before sending, fetch each domain server-side and pick the first with a real video embed (also warms lazy services like InstaFix); falls back to the first domain if none pass
+        enabled: true
+        timeout: 5s   # per-domain fetch timeout
+        budget: 20s   # overall cap across all domain probes
     aiograpi:
       base_url: ""    # e.g. http://host:8625 — the aiograpi-rest sidecar
       session_id: ""  # X-Session-ID header value (from POST /auth/login on the sidecar)
