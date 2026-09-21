@@ -49,7 +49,8 @@ type Strings struct {
 
 	/* Inline */
 	InlineSendingHint         string
-	InlineResultPlaceholder   string
+	InlineProcessingNotice    string
+	PhotoPostNotice           string
 	InlineButtonDownloading   string
 	InlineButtonOpenLink      string
 	InlineFastModeTitle       string
@@ -90,7 +91,8 @@ var localized = map[string]*Strings{
 		FailedToProcessLink:         "Failed to process link",
 		AuthGatedError:              "🔒 This video is behind an age or login gate — it can't be downloaded without signing in.",
 		InlineSendingHint:           "🐾 Tap to send",
-		InlineResultPlaceholder:     "%s\n\n%s\n\n⏳ Message will be updated upon processing completion\n\n%s",
+		InlineProcessingNotice:      "⏳ Message will be updated upon processing completion",
+		PhotoPostNotice:             "📷 This is a photo post — there is no video in it, here is the preview",
 		InlineButtonDownloading:     "⏳ Downloading...",
 		InlineButtonOpenLink:        "🌐 Open link",
 		InlineFastModeTitle:         "Download video",
@@ -129,7 +131,8 @@ var localized = map[string]*Strings{
 		FailedToProcessLink:         "Не удалось обработать ссылку",
 		AuthGatedError:              "🔒 Видео за возрастным или логин-гейтом — его не скачать без входа в аккаунт.",
 		InlineSendingHint:           "🐾 Нажми для отправки",
-		InlineResultPlaceholder:     "%s\n\n%s\n\n⏳ Сообщение обновится после обработки\n\n%s",
+		InlineProcessingNotice:      "⏳ Сообщение обновится после обработки",
+		PhotoPostNotice:             "📷 Это фото-пост — видео в нём нет, вот превью",
 		InlineButtonDownloading:     "⏳ Загружается...",
 		InlineButtonOpenLink:        "🌐 Открыть ссылку",
 		InlineFastModeTitle:         "Скачать видео",
@@ -168,7 +171,8 @@ var localized = map[string]*Strings{
 		FailedToProcessLink:         "Не вдалося обробити посилання",
 		AuthGatedError:              "🔒 Відео за віковим або лог-ін гейтом — його не завантажити без входу в акаунт.",
 		InlineSendingHint:           "🐾 Натисніть, щоб надіслати",
-		InlineResultPlaceholder:     "%s\n\n%s\n\n⏳ Повідомлення оновиться після обробки\n\n%s",
+		InlineProcessingNotice:      "⏳ Повідомлення оновиться після обробки",
+		PhotoPostNotice:             "📷 Це фото-пост — відео в ньому немає, ось прев'ю",
 		InlineButtonDownloading:     "⏳ Завантажується...",
 		InlineButtonOpenLink:        "🌐 Відкрити посилання",
 		InlineFastModeTitle:         "Завантажити відео",

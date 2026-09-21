@@ -1,7 +1,7 @@
 package inlines
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/spf13/viper"
@@ -12,9 +12,23 @@ import (
 	"video-downloader-bot/internal/utils/links"
 )
 
-func GetInlineResult(languageCode, template, thumbnail, title, description, link string) []gotgbot.InlineQueryResult {
+// GetInlineResult builds the inline article and the placeholder message it sends. Title/description
+// are the picker UI; the message itself is headline + processing notice + link. The headline is the
+// same head as the finished caption and is omitted entirely when we have no metadata (fast mode).
+func GetInlineResult(languageCode, thumbnail, title, description, headline, link string) []gotgbot.InlineQueryResult {
 	if description == "" {
 		description = s.GetLocalizedString(languageCode).InlineSendingHint
+	}
+
+	parts := make([]string, 0, 3)
+	if headline != "" {
+		parts = append(parts, headline)
+	}
+	parts = append(parts, s.GetLocalizedString(languageCode).InlineProcessingNotice, links.DetrackLink(link))
+
+	content := gotgbot.InputTextMessageContent{MessageText: strings.Join(parts, "\n\n")}
+	if headline != "" {
+		content.ParseMode = "HTML" // the headline carries <b> from the caption builder
 	}
 
 	return []gotgbot.InlineQueryResult{
@@ -23,7 +37,7 @@ func GetInlineResult(languageCode, template, thumbnail, title, description, link
 			ThumbnailUrl:        thumbnail,
 			Title:               title,
 			Description:         description,
-			InputMessageContent: gotgbot.InputTextMessageContent{MessageText: fmt.Sprintf(template, title, description, links.DetrackLink(link))},
+			InputMessageContent: content,
 			ReplyMarkup:         keyboards.GetInlinePlaceholderButton(languageCode),
 		},
 	}

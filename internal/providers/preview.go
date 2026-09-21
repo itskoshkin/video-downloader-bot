@@ -50,12 +50,12 @@ func (*previewProvider) Download(ctx context.Context, link string) (*Result, err
 	// services (InstaFix answers "Post not found" until it has fetched the reel). Falls back to
 	// index 0 when nothing validates — Telegram may still render it, and the "preview not
 	// working?" button lets the user cycle the rest by hand.
-	idx := probeWorkingDomain(ctx, link, domains)
+	idx, kind := probeWorkingDomain(ctx, link, domains)
 	rewritten, err := swapHost(link, domains[idx])
 	if err != nil {
 		return nil, ErrNotApplicable
 	}
-	return &Result{Kind: KindURL, URL: rewritten, Index: idx}, nil
+	return &Result{Kind: KindURL, URL: rewritten, Index: idx, PreviewPhoto: kind == embedImage}, nil
 }
 
 // telegramPreviewUA mimics Telegram's link-preview fetcher, so embed services return the same
@@ -76,9 +76,9 @@ const (
 // the video isn't embeddable). The fetch doubles as a warm-up for lazy services, so a second pass
 // (after a short delay) catches domains still fetching on the first. Returns 0 when probing is
 // disabled or nothing usable is found within the budget.
-func probeWorkingDomain(ctx context.Context, link string, domains []string) int {
+func probeWorkingDomain(ctx context.Context, link string, domains []string) (int, embedKind) {
 	if !viper.GetBool(config.PreviewProbeEnabled) {
-		return 0
+		return 0, embedNone
 	}
 	perFetch := viper.GetDuration(config.PreviewProbeTimeout)
 	if perFetch <= 0 {
@@ -108,7 +108,7 @@ outer:
 			}
 			switch probeEmbed(ctx, client, u) {
 			case embedVideo:
-				return i // best possible — a real video preview
+				return i, embedVideo // best possible — a real video preview
 			case embedImage:
 				if imageIdx == -1 {
 					imageIdx = i
@@ -124,9 +124,9 @@ outer:
 		}
 	}
 	if imageIdx >= 0 {
-		return imageIdx
+		return imageIdx, embedImage
 	}
-	return 0
+	return 0, embedNone
 }
 
 // probeEmbed fetches rawURL as Telegram would and reports the best og media it exposes.

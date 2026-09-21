@@ -36,7 +36,10 @@ func IsSupportedLink(link string) bool {
 	case "youtu.be":
 		return path != ""
 	case "instagram.com", "ddinstagram.com", "kkinstagram.com":
-		return strings.HasPrefix(path, "/reel/")
+		// /p/ posts can be a video, a photo or a mixed carousel — accept them and let the provider
+		// chain decide (yt-dlp downloads the video, otherwise we fall back to an image preview)
+		return strings.HasPrefix(path, "/reel/") || strings.HasPrefix(path, "/reels/") ||
+			strings.HasPrefix(path, "/p/") || strings.HasPrefix(path, "/tv/")
 	case "x.com", "twitter.com", "fxtwitter.com":
 		return strings.Contains(path, "/status/")
 	case "tiktok.com", "vxtiktok.com":

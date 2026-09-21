@@ -81,7 +81,7 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		deleteStatusMessage(bot, ctx)
 		clean := links.DetrackLink(link)
 		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, res.Index+1))
-		if _, err = bot.SendMessage(ctx.EffectiveMessage.Chat.Id, res.URL, &gotgbot.SendMessageOpts{ReplyMarkup: previewKb}); err != nil {
+		if _, err = bot.SendMessage(ctx.EffectiveMessage.Chat.Id, previewText(lang, res), &gotgbot.SendMessageOpts{ReplyMarkup: previewKb}); err != nil {
 			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 		}
 		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s.", link, storage.GetUserString(ctx.EffectiveMessage.From))
@@ -196,7 +196,7 @@ func (b *Bot) EnteredInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error
 
 	lang := s.GetUserLanguageCode(ctx)
 	cleanLink := links.DetrackLink(link)
-	var title, description, thumbnail string
+	var title, description, thumbnail, headline string
 	var fastMode bool
 	settings, err := b.settings.GetOrCreate(reqCtx, ctx.InlineQuery.From.Id)
 	if err != nil {
@@ -217,9 +217,10 @@ func (b *Bot) EnteredInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error
 		thumbnail = metadata.Thumbnail
 		title = metadata.Title
 		description = metadata.Description
+		headline = links.GetVideoHeadline(metadata, link)
 	}
 
-	_, err = ctx.InlineQuery.Answer(bot, inlines.GetInlineResult(lang, s.Lang(lang).InlineResultPlaceholder, thumbnail, title, description, cleanLink), inlines.GetDefaultOpts())
+	_, err = ctx.InlineQuery.Answer(bot, inlines.GetInlineResult(lang, thumbnail, title, description, headline, cleanLink), inlines.GetDefaultOpts())
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
@@ -255,6 +256,25 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		lang = settings.Language
 	}
 
+	// Fast mode answered the inline query without metadata, so the placeholder went out without a
+	// headline. The message exists now and the 10s inline-query deadline no longer applies, so fetch
+	// the title and fill that line in before the (much slower) download: the user sees the author
+	// appear a second or two in, then the video replaces the whole message.
+	if settings != nil && settings.SettingsFastMode {
+		if meta, mErr := videos.FetchMetadata(reqCtx, link); mErr != nil {
+			logger.DebugWithID(reqCtx, "Fast mode: no metadata for the placeholder headline: %v", mErr)
+		} else if head := links.GetVideoHeadline(meta, link); head != "" {
+			headlineText := head + "\n\n" + s.Lang(lang).InlineProcessingNotice + "\n\n" + links.DetrackLink(link)
+			if _, _, hErr := bot.EditMessageText(headlineText, &gotgbot.EditMessageTextOpts{
+				InlineMessageId: placeholderMessageID,
+				ParseMode:       "HTML",
+				ReplyMarkup:     *keyboards.GetInlinePlaceholderButton(lang),
+			}); hErr != nil {
+				logger.DebugWithID(reqCtx, "Fast mode: failed to add the headline to the placeholder: %v", hErr)
+			}
+		}
+	}
+
 	res, err := b.manager.Download(reqCtx, link)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
@@ -265,7 +285,7 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if res.Kind == providers.KindURL {
 		clean := links.DetrackLink(link)
 		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, res.Index+1))
-		if _, _, err = bot.EditMessageText(res.URL, &gotgbot.EditMessageTextOpts{InlineMessageId: placeholderMessageID, ReplyMarkup: previewKb}); err != nil {
+		if _, _, err = bot.EditMessageText(previewText(lang, res), &gotgbot.EditMessageTextOpts{InlineMessageId: placeholderMessageID, ReplyMarkup: previewKb}); err != nil {
 			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 		}
 		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s via inline mode.", link, storage.GetUserString(&ctx.Update.ChosenInlineResult.From))
@@ -357,4 +377,13 @@ func deleteStatusMessage(bot *gotgbot.Bot, ctx *ext.Context) {
 	if _, err := bot.DeleteMessage(chatID, statusMsgID, nil); err != nil {
 		logger.WarnWithID(req.FromExtContext(ctx), "Failed to delete status message: %v", err)
 	}
+}
+
+// previewText is the message body for a URL-rewrite preview: just the link, plus a heads-up when the
+// embed only offers an image — i.e. the post is a photo/carousel and there was never a video to fetch.
+func previewText(lang string, res *providers.Result) string {
+	if res.PreviewPhoto {
+		return s.Lang(lang).PhotoPostNotice + "\n\n" + res.URL
+	}
+	return res.URL
 }

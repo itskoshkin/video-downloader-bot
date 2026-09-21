@@ -46,35 +46,53 @@ func getServiceIcon(meta *ytdlp.Metadata, link string) (string, int) {
 	}
 }
 
-func GetVideoCaption(metadata *ytdlp.Metadata, link string) string {
-	link = DetrackLink(link)
-
-	var icon, service = getServiceIcon(metadata, link)
-	var caption = fmt.Sprintf("%s ", icon)
-
-repeat:
-	caption = fmt.Sprintf("%s ", icon)
-	desc := quotedDescription(metadata.Description)
+// videoHeadline builds the "<icon> <kind> from <author> (<handle>)" head of a caption — without the
+// description and without the trailing link. Shared by the finished caption and the inline placeholder.
+func videoHeadline(metadata *ytdlp.Metadata, link, icon string, service int) string {
+	head := fmt.Sprintf("%s ", icon)
 	switch service {
 	case 1:
-		caption += "Tweet from " + s.Bold(metadata.Author) + " (" + getTwitterUsername(link) + ")" + quotedDescription(trimTwitterLinkInTweet(metadata.Description)) + "\n\n" + link
+		head += "Tweet from " + s.Bold(metadata.Author) + " (" + getTwitterUsername(link) + ")"
 	case 2:
 		author := s.Bold(metadata.Author)
 		if metadata.AuthorID != "" {
 			author += " (" + metadata.AuthorID + ")"
 		}
 		if strings.Contains(link, ".com/shorts/") {
-			caption += "Short «" + metadata.Title + "» from " + author + desc + "\n\n" + link
+			head += "Short «" + metadata.Title + "» from " + author
 		} else {
-			caption += "Video «" + metadata.Title + "» from " + author + desc + "\n\n" + link
+			head += "Video «" + metadata.Title + "» from " + author
 		}
 	case 3:
-		caption += "Reel from " + s.Bold(metadata.Author) + " (" + getInstagramUsername(metadata.Title) + ")" + desc + "\n\n" + link
+		head += "Reel from " + s.Bold(metadata.Author) + " (" + getInstagramUsername(metadata.Title) + ")"
 	case 4:
-		caption += "TikTok from " + s.Bold(metadata.Author) + desc + "\n\n" + link
+		head += "TikTok from " + s.Bold(metadata.Author)
 	default:
-		caption += metadata.Title + " — " + metadata.Author + desc + "\n\n" + link
+		head += metadata.Title + " — " + metadata.Author
 	}
+	return head
+}
+
+// GetVideoHeadline is the caption head alone, so the inline placeholder can read like the finished
+// post while it is still processing. Empty metadata means no headline to show.
+func GetVideoHeadline(metadata *ytdlp.Metadata, link string) string {
+	link = DetrackLink(link)
+	icon, service := getServiceIcon(metadata, link)
+	return videoHeadline(metadata, link, icon, service)
+}
+
+func GetVideoCaption(metadata *ytdlp.Metadata, link string) string {
+	link = DetrackLink(link)
+
+	var icon, service = getServiceIcon(metadata, link)
+	var caption string
+
+repeat:
+	desc := quotedDescription(metadata.Description)
+	if service == 1 { // the tweet body repeats the t.co link we already print
+		desc = quotedDescription(trimTwitterLinkInTweet(metadata.Description))
+	}
+	caption = videoHeadline(metadata, link, icon, service) + desc + "\n\n" + link
 
 	if len([]rune(caption)) > constants.MaxMediaCaptionLength {
 		overflow := len([]rune(caption)) - constants.MaxMediaCaptionLength
