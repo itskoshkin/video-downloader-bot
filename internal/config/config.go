@@ -121,7 +121,7 @@ func ValidateConfigFields() error {
 		/* Providers */
 		ProvidersChainDefault:          []string{"yt-dlp", "preview"},
 		ProvidersChainKey("instagram"): []string{"yt-dlp", "aiograpi", "hikerapi", "preview"},
-		PreviewInstagramDomains:        []string{"eeinstagram.com", "uuinstagram.com", "zzinstagram.com", "kirkstagram.com"}, // vxinstagram.com disabled: died somewhere in August '26 (last Wayback 200 on 10.08, still up 27.08, confirmed 502 on 21.09); DNS resolves, upstream unmaintained since Apr '26
+		PreviewInstagramDomains:        []string{"kirkstagram.com", "eeinstagram.com", "uuinstagram.com", "zzinstagram.com"}, // vxinstagram.com disabled: died somewhere in August '26 (last Wayback 200 on 10.08, still up 27.08, confirmed 502 on 21.09); DNS resolves, upstream unmaintained since Apr '26; kirkstagram first — ee/uu/zz were empty/403/502 on 21.09.2026 but kept as backups
 		PreviewTiktokDomains:           []string{"tnktok.com"},
 		PreviewProbeEnabled:            true,
 		PreviewProbeTimeout:            "5s",

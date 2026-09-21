@@ -58,10 +58,10 @@ app:
         # - kkclip.com      # Intrusive pop-ups & malware ads 🤡
         # - instagramez.com # EmbedEZ (embedez.com), redirects to malvertising popunder (effectivegatecpm.com), premium "removes" it 🤡
         # - vxinstagram.com # Disabled: died somewhere in August '26 (502; DNS still resolves). A Jun '26 outage was fixed in 2 days, so re-check before deleting
-        - eeinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/180#issuecomment-3285698107 / https://github.com/Wikidepia/InstaFix/issues/182#issue-3418754919
-        - uuinstagram.com   # Some Wikidepia/InstaFix instance
-        - zzinstagram.com   # https://github.com/Wikidepia/InstaFix/issues/181#issuecomment-3507144482 / https://github.com/Knoppiix/InstaEmbedRouter
-        - kirkstagram.com   # added 21.09.2026
+        - kirkstagram.com   # added 21.09.2026 — only one still rendering on that date; the probe auto-picks the working one anyway
+        - eeinstagram.com   # 21.09.2026: HTTP 200 but empty og-tags; kept as backup
+        - uuinstagram.com   # 21.09.2026: HTTP 403; kept as backup
+        - zzinstagram.com   # 21.09.2026: HTTP 502; kept as backup
       tiktok_domains:
         # - vxtiktok.com # Down due to legal reasons
         # - tiktokez.com # EmbedEZ (embedez.com)

@@ -62,10 +62,20 @@ func (*previewProvider) Download(ctx context.Context, link string) (*Result, err
 // og: markup Telegram will see (several of them serve og-tags only to known preview bots).
 const telegramPreviewUA = "TelegramBot (like TwitterBot)"
 
-// probeWorkingDomain fetches each candidate embed URL and returns the index of the first that
-// exposes an og:video tag. The fetch doubles as a warm-up for lazy services, so a second pass
-// (after a short delay) catches domains that were still fetching on the first one. Returns 0
-// when probing is disabled or nothing validates within the budget.
+// embedKind classifies what a candidate embed page can render.
+type embedKind int
+
+const (
+	embedNone  embedKind = iota // no usable og media (error page, "Post not found", empty)
+	embedImage                  // og:image only — a photo/carousel post, or a video with no playable embed
+	embedVideo                  // og:video — a real inline video preview
+)
+
+// probeWorkingDomain fetches each candidate embed URL and returns the index of the best one: the
+// first domain exposing og:video, or failing that the first with og:image (photo posts, or when
+// the video isn't embeddable). The fetch doubles as a warm-up for lazy services, so a second pass
+// (after a short delay) catches domains still fetching on the first. Returns 0 when probing is
+// disabled or nothing usable is found within the budget.
 func probeWorkingDomain(ctx context.Context, link string, domains []string) int {
 	if !viper.GetBool(config.PreviewProbeEnabled) {
 		return 0
@@ -85,48 +95,65 @@ func probeWorkingDomain(ctx context.Context, link string, domains []string) int 
 		rounds    = 2                       // first pass warms lazy services, second catches them warmed
 		warmDelay = 1500 * time.Millisecond // grace period between passes for the warm-up to finish
 	)
+	imageIdx := -1 // first domain that offered at least an og:image, used when no og:video shows up
+outer:
 	for round := 0; round < rounds; round++ {
 		for i, d := range domains {
 			if ctx.Err() != nil || time.Now().After(deadline) {
-				return 0
+				break outer
 			}
 			u, err := swapHost(link, d)
 			if err != nil {
 				continue
 			}
-			if hasVideoEmbed(ctx, client, u) {
-				return i
+			switch probeEmbed(ctx, client, u) {
+			case embedVideo:
+				return i // best possible — a real video preview
+			case embedImage:
+				if imageIdx == -1 {
+					imageIdx = i
+				}
 			}
 		}
 		if round+1 < rounds {
 			select {
 			case <-time.After(warmDelay):
 			case <-ctx.Done():
-				return 0
+				break outer
 			}
 		}
+	}
+	if imageIdx >= 0 {
+		return imageIdx
 	}
 	return 0
 }
 
-// hasVideoEmbed reports whether rawURL returns an HTML page carrying an og:video meta tag.
-func hasVideoEmbed(ctx context.Context, client *http.Client, rawURL string) bool {
+// probeEmbed fetches rawURL as Telegram would and reports the best og media it exposes.
+func probeEmbed(ctx context.Context, client *http.Client, rawURL string) embedKind {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return false
+		return embedNone
 	}
 	req.Header.Set("User-Agent", telegramPreviewUA)
 	req.Header.Set("Accept", "text/html")
 	resp, err := client.Do(req)
 	if err != nil {
-		return false
+		return embedNone
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return false
+		return embedNone
 	}
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024)) // og: tags live in <head>
-	return bytes.Contains(body, []byte("og:video"))
+	switch {
+	case bytes.Contains(body, []byte("og:video")):
+		return embedVideo
+	case bytes.Contains(body, []byte("og:image")):
+		return embedImage
+	default:
+		return embedNone
+	}
 }
 
 // PreviewDomains returns the configured embed-fix domains for a platform (primary first).
