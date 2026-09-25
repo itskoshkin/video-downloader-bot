@@ -220,7 +220,7 @@ TLDR – you have to register a *throw-away* accounts, open incognito window wit
 
 #### Non-root container
 
-The Docker image runs as a non-root user (uid **10001**). With bind mounts (`-v $PWD/files:/app/files`, `-v $PWD/logs:/app/logs`) the **host** `files/` and `logs/` dirs must be writable by that uid — e.g. `sudo chown -R 10001 files logs` on the host — otherwise the bot can't write downloads or logs. Updating `yt-dlp` inside a running non-root container needs root, so `make update-ytdlp` (and the weekly cron) run `docker exec -u root`.
+The bot runs as a non-root user (uid **10001**). The container starts as root only long enough for `entrypoint.sh` to `chown` the bind-mounted `files/` and `logs/` dirs (`-v $PWD/files:/app/files`, `-v $PWD/logs:/app/logs`) to that uid, then drops privileges with `su-exec` — so host dirs owned by root no longer break downloads. Started with `--user 10001`, the entrypoint skips that step and the host dirs must already be writable by uid 10001. Updating `yt-dlp` inside a running container needs root, so `make update-ytdlp` (and the weekly cron) run `docker exec -u root`.
 
 #### Error messages
 
