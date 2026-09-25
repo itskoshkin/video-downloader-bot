@@ -87,6 +87,7 @@ func DownloadVideo(ctx context.Context, link string) (string, error) {
 		"--print", "after_move:filepath", // Print the final file path after the file has been fully downloaded and moved into place
 		"--newline",      // Print progress and log output line by line instead of updating one terminal line in place
 		"-f", "bv*+ba/b", // Choose format: best available video and available audio or fallback to best single file if separate video/audio is not available
+		"-S", "vcodec:h264,res:1080,acodec:aac", // Rank H.264 up to 1080p with AAC first, so ffmpeg can just remux it instead of re-encoding 1440p VP9 / 4K AV1 (which gets OOM-killed on a small VPS)
 		"--merge-output-format", "mp4", // f video and audio are downloaded separately, merge them into an MP4 container
 		"-o", viper.GetString(config.TelegramBotVideoDownloadFolder) + "%(id)s.%(ext)s", // Output file name template ("%(id)s" is the media ID and "%(ext)s" is the resulting file extension)
 		"--no-playlist",                                                                     // Download only the single media item, not the whole playlist/thread/collection

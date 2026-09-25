@@ -93,11 +93,11 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	// File result: convert to H.264/AAC, then upload. Keep the status message until conversion
 	// succeeds, so a conversion failure can still be reported on it.
+	defer func() { _ = os.Remove(res.FilePath) }()
 	converted, err := videos.Convert(reqCtx, res.FilePath)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
-	defer func() { _ = os.Remove(res.FilePath) }()
 	defer func() { _ = os.Remove(converted) }()
 
 	deleteStatusMessage(bot, ctx)
@@ -293,11 +293,11 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// File result: convert, push to the dump channel for a file_id, then swap it into the placeholder.
+	defer func() { _ = os.Remove(res.FilePath) }()
 	converted, err := videos.Convert(reqCtx, res.FilePath)
 	if err != nil {
 		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
 	}
-	defer func() { _ = os.Remove(res.FilePath) }()
 	defer func() { _ = os.Remove(converted) }()
 
 	file, err := os.Open(converted)
