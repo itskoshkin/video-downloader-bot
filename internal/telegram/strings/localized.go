@@ -56,6 +56,11 @@ type Strings struct {
 	InlineFastModeTitle       string
 	InlineFastModeDescription string
 	PreviewBrokenButton       string
+
+	/* Retry */
+	RetryButton        string
+	ProcessingTimedOut string
+	RetryExpired       string
 }
 
 var localized = map[string]*Strings{
@@ -98,6 +103,9 @@ var localized = map[string]*Strings{
 		InlineFastModeTitle:         "Download video",
 		InlineFastModeDescription:   "Tap to send — video will appear shortly",
 		PreviewBrokenButton:         "Preview not working?",
+		RetryButton:                 "🔄 Didn't work? Retry",
+		ProcessingTimedOut:          "Processing took too long and was stopped",
+		RetryExpired:                "This request has expired, send the link again",
 	},
 	"ru": {
 		Welcome:                     "Привет!\n\nЭтот бот бла-бла-бла бла-бла-бла\n\nБла-бла-бла бла-бла-бла бла-бла-бла\n\nОтправь /help для списка команд",
@@ -138,6 +146,9 @@ var localized = map[string]*Strings{
 		InlineFastModeTitle:         "Скачать видео",
 		InlineFastModeDescription:   "Нажми чтобы отправить — видео появится через некоторое время",
 		PreviewBrokenButton:         "Превью не работает?",
+		RetryButton:                 "🔄 Не сработало? Повторить",
+		ProcessingTimedOut:          "Обработка заняла слишком много времени и была остановлена",
+		RetryExpired:                "Запрос устарел, отправь ссылку заново",
 	},
 	"ua": {
 		Welcome:                     "Привіт!\n\nЦей бот бла-бла-бла бла-бла-бла\n\nБла-бла-бла бла-бла-бла бла-бла-бла\n\nНадішли /help для списку команд",
@@ -178,6 +189,9 @@ var localized = map[string]*Strings{
 		InlineFastModeTitle:         "Завантажити відео",
 		InlineFastModeDescription:   "Натисни щоб надіслати — відео з'явиться незабаром",
 		PreviewBrokenButton:         "Прев'ю не працює?",
+		RetryButton:                 "🔄 Не спрацювало? Повторити",
+		ProcessingTimedOut:          "Обробка тривала занадто довго й була зупинена",
+		RetryExpired:                "Запит застарів, надішли посилання знову",
 	},
 }
 

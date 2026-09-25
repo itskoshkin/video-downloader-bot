@@ -42,6 +42,11 @@ func GetPreviewKeyboard(languageCode, openURL, cycleData string) gotgbot.InlineK
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
+// GetRetryButton is the "Didn't work? Retry" button shown on a request that timed out or was left hanging by a crash
+func GetRetryButton(languageCode, retryData string) []gotgbot.InlineKeyboardButton {
+	return []gotgbot.InlineKeyboardButton{{Text: s.Lang(languageCode).RetryButton, CallbackData: retryData}}
+}
+
 func GetSettingsKeyboard(user *models.User) *gotgbot.InlineKeyboardMarkup {
 	fastMode := s.Lang(user.Lang()).SettingsFastMode + ": "
 	if user.SettingsFastMode {

@@ -34,6 +34,7 @@ app:
       rate_limit_per_day: 100
       max_file_size_mb: 50 # MB; max is 50 (formats are picked to fit it, stepping down in quality), see https://core.telegram.org/bots/faq#how-do-i-upload-a-large-file
       max_video_duration: 300 # seconds
+      processing_timeout: 600 # seconds; a link still processing after this is stopped and gets a "Retry" button (also shown on messages left hanging by a crash or restart)
       inline_cache_time: 0 # seconds
     gotgbot_debug: false
   yt-dlp:

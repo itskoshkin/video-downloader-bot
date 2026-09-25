@@ -39,6 +39,15 @@ type SettingsService interface {
 	CycleCaptionMode(ctx context.Context, userID int64) (*models.User, error)
 }
 
+type JobStore interface {
+	Create(ctx context.Context, job *models.Job) error
+	Get(ctx context.Context, id uint) (*models.Job, error)
+	Delete(ctx context.Context, id uint) (bool, error)
+	MarkStale(ctx context.Context, id uint) error
+	ListStuck(ctx context.Context, before time.Time) ([]models.Job, error)
+	DeleteOlderThan(ctx context.Context, before time.Time) error
+}
+
 type Bot struct {
 	bot        *gotgbot.Bot
 	updater    *ext.Updater
@@ -46,11 +55,12 @@ type Bot struct {
 
 	users       UserService
 	settings    SettingsService
+	jobs        JobStore
 	rateLimiter *ratelimit.RateLimiter
 	manager     *providers.Manager
 }
 
-func NewBot(users UserService, settings SettingsService, manager *providers.Manager) *Bot {
+func NewBot(users UserService, settings SettingsService, jobs JobStore, manager *providers.Manager) *Bot {
 	bot, err := gotgbot.NewBot(viper.GetString(config.TelegramBotToken), &gotgbot.BotOpts{
 		BotClient: &gotgbot.BaseBotClient{Client: *proxy.Client(0)}, // route all Telegram HTTP through the SOCKS5 proxy when configured
 	})
@@ -79,7 +89,7 @@ func NewBot(users UserService, settings SettingsService, manager *providers.Mana
 		viper.GetInt(config.TelegramBotRateLimitPerDay),
 	)
 
-	return &Bot{bot: bot, dispatcher: dispatcher, updater: updater, users: users, settings: settings, rateLimiter: rateLimiter, manager: manager}
+	return &Bot{bot: bot, dispatcher: dispatcher, updater: updater, users: users, settings: settings, jobs: jobs, rateLimiter: rateLimiter, manager: manager}
 }
 
 func (b *Bot) RegisterHandlers() {
@@ -95,6 +105,7 @@ func (b *Bot) RegisterHandlers() {
 	b.dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("settings:"), b.SettingsCallback))
 	b.dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("farewell:"), b.FarewellCallback))
 	b.dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("preview:"), b.PreviewCallback))
+	b.dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix(retryPrefix), b.RetryCallback))
 
 	// Messages
 	b.dispatcher.AddHandler(handlers.NewMessage(message.Text, b.LinkHandler))
@@ -118,6 +129,8 @@ func (b *Bot) Run() {
 	}
 
 	fmt.Println(text.Green("  Done."))
+
+	b.StartJobSweeper() // After polling is up: it edits messages through the bot
 }
 
 func (b *Bot) Idle() {

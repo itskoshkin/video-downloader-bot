@@ -13,6 +13,7 @@ import (
 
 	"video-downloader-bot/internal/config"
 	"video-downloader-bot/internal/logger"
+	"video-downloader-bot/internal/telegram/helpers/keyboards"
 	"video-downloader-bot/internal/telegram/helpers/reactions"
 	"video-downloader-bot/internal/telegram/middlewares/requests"
 	s "video-downloader-bot/internal/telegram/strings"
@@ -101,19 +102,24 @@ func HandleError(bot *gotgbot.Bot, ctx *ext.Context, languageCode string, messag
 	}
 
 	requestID, _ := ctx.Data["request_id"].(string)
+	retryData, _ := ctx.Data["retry_data"].(string) // Set by the link handlers when processing timed out
+
+	var rows [][]gotgbot.InlineKeyboardButton
+	if retryData != "" {
+		rows = append(rows, keyboards.GetRetryButton(languageCode, retryData))
+	}
+	if requestID != "" {
+		rows = append(rows, []gotgbot.InlineKeyboardButton{
+			{Text: s.Lang(languageCode).RequestID + ": " + requestID, CopyText: &gotgbot.CopyTextButton{Text: requestID}},
+		})
+		//rows = append(rows, []gotgbot.InlineKeyboardButton{
+		//	{Text: "Get support", Url: "https://t.me/feed_the_cat_bot?start=" + requestID}, //TODO: Enable
+		//})
+	}
 
 	var replyMarkup *gotgbot.InlineKeyboardMarkup
-	if requestID != "" {
-		replyMarkup = &gotgbot.InlineKeyboardMarkup{
-			InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-				{
-					{Text: s.Lang(languageCode).RequestID + ": " + requestID, CopyText: &gotgbot.CopyTextButton{Text: requestID}},
-				},
-				//{
-				//	{Text: "Get support", Url: "https://t.me/feed_the_cat_bot?start=" + requestID}, //TODO: Enable
-				//},
-			},
-		}
+	if len(rows) > 0 {
+		replyMarkup = &gotgbot.InlineKeyboardMarkup{InlineKeyboard: rows}
 	}
 
 	if statusMsgID, ok := ctx.Data["status_message_id"].(int64); ok && statusMsgID != 0 {

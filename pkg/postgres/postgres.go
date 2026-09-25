@@ -50,7 +50,7 @@ func NewInstance(cfg Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("GORM: failed to ping database: %v", err)
 	}
 
-	if err = db.AutoMigrate(&models.User{}); err != nil {
+	if err = db.AutoMigrate(&models.User{}, &models.Job{}); err != nil {
 		_ = sqlDB.Close()
 		fmt.Println()
 		return nil, fmt.Errorf("GORM: failed to auto-migrate: %v", err)

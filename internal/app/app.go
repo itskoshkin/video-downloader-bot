@@ -56,6 +56,7 @@ func Load() *App {
 
 	// Storages
 	userStore := storage.NewUserStorage(db)
+	jobStore := storage.NewJobStorage(db)
 
 	// Services
 	userSvc := services.NewUserService(userStore)
@@ -70,7 +71,7 @@ func Load() *App {
 	)
 
 	// Telegram
-	bot := telegram.NewBot(userSvc, setsSvc, manager)
+	bot := telegram.NewBot(userSvc, setsSvc, jobStore, manager)
 
 	return &App{bot: bot, db: db}
 }

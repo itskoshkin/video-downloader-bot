@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,9 +72,26 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		ctx.Data["status_chat_id"] = ctx.EffectiveMessage.Chat.Id
 	}
 
+	return b.processChatLink(bot, ctx, lang, settings, link)
+}
+
+// processChatLink downloads the link and sends the result to a private chat. ctx.EffectiveMessage is the user's message with the link and
+// ctx.Data holds the "⏳ Downloading..." status message; shared by LinkHandler and the retry button.
+func (b *Bot) processChatLink(bot *gotgbot.Bot, ctx *ext.Context, lang string, settings *models.User, link string) error {
+	var job *models.Job
+	if statusMsgID, _ := ctx.Data["status_message_id"].(int64); statusMsgID != 0 { // No status message, nothing to attach a retry button to
+		statusChatID, _ := ctx.Data["status_chat_id"].(int64)
+		job = b.startJob(req.FromExtContext(ctx), &models.Job{UserID: ctx.EffectiveUser.Id, Lang: lang, Link: link, ChatID: statusChatID, MessageID: statusMsgID})
+	}
+	defer func() { b.endJob(req.FromExtContext(ctx), job) }()
+
+	reqCtx, cancel := context.WithTimeout(req.FromExtContext(ctx), processingTimeout())
+	defer cancel()
+	fail := func(err error) error { return b.fail(bot, ctx, lang, reqCtx, job, err) }
+
 	res, err := b.manager.Download(reqCtx, link)
 	if err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 
 	// Preview-URL result (URL-rewrite to an embed-fix domain): nothing to convert or upload — let Telegram render the link.
@@ -82,9 +100,9 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		clean := links.DetrackLink(link)
 		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, res.Index+1))
 		if _, err = bot.SendMessage(ctx.EffectiveMessage.Chat.Id, previewText(lang, res), &gotgbot.SendMessageOpts{ReplyMarkup: previewKb}); err != nil {
-			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+			return fail(err)
 		}
-		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s.", link, storage.GetUserString(ctx.EffectiveMessage.From))
+		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s.", link, storage.GetUserString(ctx.EffectiveUser))
 		if err = reactions.ReactWithTimer(bot, ctx, reactions.ReactionOK, 4); err != nil {
 			logger.WarnWithID(reqCtx, "Failed to set reaction: %v", err)
 		}
@@ -96,7 +114,7 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	defer func() { _ = os.Remove(res.FilePath) }()
 	converted, err := videos.Convert(reqCtx, res.FilePath)
 	if err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 	defer func() { _ = os.Remove(converted) }()
 
@@ -104,7 +122,7 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	file, err := os.Open(converted)
 	if err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 	defer func() { _ = file.Close() }()
 
@@ -136,7 +154,7 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		}
 	}
 
-	logger.DebugWithID(reqCtx, "Sending video to %s...", storage.GetUserString(ctx.EffectiveMessage.From))
+	logger.DebugWithID(reqCtx, "Sending video to %s...", storage.GetUserString(ctx.EffectiveUser))
 
 	sendOpts := &gotgbot.SendVideoOpts{Caption: caption, ParseMode: parseMode, SupportsStreaming: true}
 	if dims != nil {
@@ -145,10 +163,10 @@ func (b *Bot) LinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	if _, err = bot.SendVideo(ctx.EffectiveMessage.Chat.Id, gotgbot.InputFileByReader(filepath.Base(converted), file), sendOpts); err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 
-	logger.InfoWithID(reqCtx, "Video (%s) sent to %s.", link, storage.GetUserString(ctx.EffectiveMessage.From))
+	logger.InfoWithID(reqCtx, "Video (%s) sent to %s.", link, storage.GetUserString(ctx.EffectiveUser))
 
 	if err = reactions.ReactWithTimer(bot, ctx, reactions.ReactionOK, 4); err != nil {
 		logger.WarnWithID(reqCtx, "Failed to set reaction: %v", err)
@@ -248,13 +266,26 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	go func() { storage.EnsureUser(ctx, b.users, new(models.UsageInline)) }()
 
+	return b.processInlineLink(bot, ctx, link, placeholderMessageID, &ctx.ChosenInlineResult.From)
+}
+
+// processInlineLink downloads the link and swaps the result into the inline placeholder message; ctx.Data holds the placeholder for
+// error reporting. Shared by SentInlineLinkHandler and the retry button.
+func (b *Bot) processInlineLink(bot *gotgbot.Bot, ctx *ext.Context, link, placeholderMessageID string, from *gotgbot.User) error {
 	lang := s.GetUserLanguageCode(ctx)
-	settings, err := b.settings.GetOrCreate(reqCtx, ctx.Update.ChosenInlineResult.From.Id)
+	settings, err := b.settings.GetOrCreate(req.FromExtContext(ctx), from.Id)
 	if err != nil {
-		logger.ErrorWithID(reqCtx, "Failed to get settings for user %s: %v", storage.GetUserString(ctx.EffectiveUser), err)
+		logger.ErrorWithID(req.FromExtContext(ctx), "Failed to get settings for user %s: %v", storage.GetUserString(from), err)
 	} else {
 		lang = settings.Language
 	}
+
+	job := b.startJob(req.FromExtContext(ctx), &models.Job{UserID: from.Id, Lang: lang, Link: link, InlineMessageID: placeholderMessageID})
+	defer func() { b.endJob(req.FromExtContext(ctx), job) }()
+
+	reqCtx, cancel := context.WithTimeout(req.FromExtContext(ctx), processingTimeout())
+	defer cancel()
+	fail := func(err error) error { return b.fail(bot, ctx, lang, reqCtx, job, err) }
 
 	// Fast mode answered the inline query without metadata, so the placeholder went out without a
 	// headline. The message exists now and the 10s inline-query deadline no longer applies, so fetch
@@ -277,7 +308,7 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	res, err := b.manager.Download(reqCtx, link)
 	if err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 
 	// Preview-URL result (URL-rewrite to an embed-fix domain): edit the placeholder to the preview link
@@ -286,9 +317,9 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		clean := links.DetrackLink(link)
 		previewKb := keyboards.GetPreviewKeyboard(lang, "https://"+clean, providers.PreviewCycleData(clean, res.Index+1))
 		if _, _, err = bot.EditMessageText(previewText(lang, res), &gotgbot.EditMessageTextOpts{InlineMessageId: placeholderMessageID, ReplyMarkup: previewKb}); err != nil {
-			return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+			return fail(err)
 		}
-		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s via inline mode.", link, storage.GetUserString(&ctx.Update.ChosenInlineResult.From))
+		logger.InfoWithID(reqCtx, "Preview (%s) sent to %s via inline mode.", link, storage.GetUserString(from))
 		return nil
 	}
 
@@ -296,13 +327,13 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	defer func() { _ = os.Remove(res.FilePath) }()
 	converted, err := videos.Convert(reqCtx, res.FilePath)
 	if err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 	defer func() { _ = os.Remove(converted) }()
 
 	file, err := os.Open(converted)
 	if err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 	defer func() { _ = file.Close() }()
 
@@ -321,14 +352,14 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	msg, err := bot.SendVideo(viper.GetInt64(config.TelegramBotVideoDumpChatID), gotgbot.InputFileByReader(filepath.Base(converted), file), sendVideoOpts)
 	if err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 
 	logger.DebugWithID(reqCtx, "Sent video to dump channel.")
 
 	//noinspection GoErrorStringFormat
 	if msg.Video == nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, fmt.Errorf("Telegram returned message without videos"))
+		return fail(fmt.Errorf("Telegram returned message without videos"))
 	}
 
 	captionMode := models.CaptionFullDetails
@@ -359,10 +390,10 @@ func (b *Bot) SentInlineLinkHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		gotgbot.InputMediaVideo{Media: gotgbot.InputFileByID(msg.Video.FileId), Caption: caption, ParseMode: "HTML", SupportsStreaming: false},
 		&gotgbot.EditMessageMediaOpts{InlineMessageId: placeholderMessageID, ReplyMarkup: keyboards.GetInlineResultButton(lang, links.DetrackLink(link))},
 	); err != nil {
-		return errors.HandleError(bot, ctx, lang, s.Lang(lang).FailedToProcessLink, err)
+		return fail(err)
 	}
 
-	logger.InfoWithID(reqCtx, "Video (%s) sent to %s via inline mode.", link, storage.GetUserString(&ctx.Update.ChosenInlineResult.From))
+	logger.InfoWithID(reqCtx, "Video (%s) sent to %s via inline mode.", link, storage.GetUserString(from))
 
 	return nil
 }

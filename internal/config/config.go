@@ -48,6 +48,7 @@ const (
 	TelegramBotInlineCacheTime      = "app.telegram.bot.inline_cache_time"     // int (seconds)
 	TelegramBotMaxFileSizeMB        = "app.telegram.bot.max_file_size_mb"      // int
 	TelegramBotMaxVideoDuration     = "app.telegram.bot.max_video_duration"    // int (seconds)
+	TelegramBotProcessingTimeout    = "app.telegram.bot.processing_timeout"    // int (seconds)
 
 	YtDlpBinary      = "app.yt-dlp.binary_file"  // string (path)
 	YtDlpDebug       = "app.yt-dlp.debug"        // bool
@@ -116,7 +117,7 @@ func ValidateConfigFields() error {
 		/* Telegram */ TelegramBotLongPollingTimeout: 9, TelegramBotHttpClientTimeout: 10,
 		TelegramBotVideoDownloadFolder: "./files/downloads", TelegramBotVideoConvertedFolder: "./files/converted",
 		TelegramBotRateLimitPerMinute: 10, TelegramBotRateLimitBurst: 3, TelegramBotRateLimitPerDay: 100,
-		TelegramBotMaxFileSizeMB: 50, TelegramBotMaxVideoDuration: 300, TelegramBotInlineCacheTime: 0,
+		TelegramBotMaxFileSizeMB: 50, TelegramBotMaxVideoDuration: 300, TelegramBotInlineCacheTime: 0, TelegramBotProcessingTimeout: 600,
 		/* External tools */ YtDlpDebug: false, FfmpegDebug: false,
 		/* Providers */
 		ProvidersChainDefault:          []string{"yt-dlp", "preview"},
