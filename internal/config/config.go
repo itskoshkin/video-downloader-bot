@@ -116,7 +116,7 @@ func ValidateConfigFields() error {
 		/* Telegram */ TelegramBotLongPollingTimeout: 9, TelegramBotHttpClientTimeout: 10,
 		TelegramBotVideoDownloadFolder: "./files/downloads", TelegramBotVideoConvertedFolder: "./files/converted",
 		TelegramBotRateLimitPerMinute: 10, TelegramBotRateLimitBurst: 3, TelegramBotRateLimitPerDay: 100,
-		TelegramBotMaxFileSizeMB: 20, TelegramBotMaxVideoDuration: 300, TelegramBotInlineCacheTime: 0,
+		TelegramBotMaxFileSizeMB: 50, TelegramBotMaxVideoDuration: 300, TelegramBotInlineCacheTime: 0,
 		/* External tools */ YtDlpDebug: false, FfmpegDebug: false,
 		/* Providers */
 		ProvidersChainDefault:          []string{"yt-dlp", "preview"},

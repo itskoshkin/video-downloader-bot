@@ -32,7 +32,7 @@ app:
       rate_limit_per_minute: 12
       rate_limit_burst: 3
       rate_limit_per_day: 100
-      max_file_size_mb: 20 # MB; max is 50, see https://core.telegram.org/bots/faq#how-do-i-upload-a-large-file
+      max_file_size_mb: 50 # MB; max is 50 (formats are picked to fit it, stepping down in quality), see https://core.telegram.org/bots/faq#how-do-i-upload-a-large-file
       max_video_duration: 300 # seconds
       inline_cache_time: 0 # seconds
     gotgbot_debug: false

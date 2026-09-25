@@ -83,16 +83,21 @@ func DownloadVideo(ctx context.Context, link string) (string, error) {
 		return "", fmt.Errorf("yt-dlp: download videos: empty url")
 	}
 
+	limitMB := viper.GetInt(config.TelegramBotMaxFileSizeMB)
+	videoMB := limitMB * 4 / 5 // Leave ~20% of the limit for the separate audio track
+
 	args := []string{
 		"--print", "after_move:filepath", // Print the final file path after the file has been fully downloaded and moved into place
-		"--newline",      // Print progress and log output line by line instead of updating one terminal line in place
-		"-f", "bv*+ba/b", // Choose format: best available video and available audio or fallback to best single file if separate video/audio is not available
+		"--newline", // Print progress and log output line by line instead of updating one terminal line in place
+		// Choose format: the best video+audio (or single file) whose known size fits the limit, stepping down in quality until one does
+		// Formats with an unknown size (HLS, Instagram) only come last, so a size-less 1080p stream can't jump ahead of a smaller known one
+		"-f", fmt.Sprintf("bv*[filesize<%[1]dM]+ba/bv*[filesize_approx<%[1]dM]+ba/b[filesize<%[2]dM]/b[filesize_approx<%[2]dM]/bv*+ba/b", videoMB, limitMB),
 		"-S", "vcodec:h264,res:1080,acodec:aac", // Rank H.264 up to 1080p with AAC first, so ffmpeg can just remux it instead of re-encoding 1440p VP9 / 4K AV1 (which gets OOM-killed on a small VPS)
 		"--merge-output-format", "mp4", // f video and audio are downloaded separately, merge them into an MP4 container
 		"-o", viper.GetString(config.TelegramBotVideoDownloadFolder) + "%(id)s.%(ext)s", // Output file name template ("%(id)s" is the media ID and "%(ext)s" is the resulting file extension)
-		"--no-playlist",                                                                     // Download only the single media item, not the whole playlist/thread/collection
-		"--no-update",                                                                       // Never check for updates (silences the periodic "version is out of date" warning); updates are handled via pip only
-		"--max-filesize", fmt.Sprintf("%dM", viper.GetInt(config.TelegramBotMaxFileSizeMB)), // Skip download if filesize exceeds limit
+		"--no-playlist",                               // Download only the single media item, not the whole playlist/thread/collection
+		"--no-update",                                 // Never check for updates (silences the periodic "version is out of date" warning); updates are handled via pip only
+		"--max-filesize", fmt.Sprintf("%dM", limitMB), // Last-resort guard for formats whose size was unknown up front: skip the download if it turns out bigger
 		"--match-filter", fmt.Sprintf("duration<=?%d", viper.GetInt(config.TelegramBotMaxVideoDuration)), // Skip download if duration exceeds limit (? = skip check if duration is unknown)
 	}
 	if viper.GetBool(config.YtDlpUseCookies) {
